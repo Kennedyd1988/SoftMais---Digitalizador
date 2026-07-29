@@ -53,12 +53,12 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
   <!-- PDF.js — usado só para contar páginas do PDF antes do upload
-       (versão "legacy", necessária para expor a variável global pdfjsLib
-       quando carregada como <script> comum, sem módulos ES) -->
-  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/legacy/build/pdf.min.js"></script>
+       (versão 3.x: a partir da v4 a biblioteca virou 100% módulo ES e
+       não expõe mais a variável global pdfjsLib em <script> comum) -->
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.min.js"></script>
   <script>
     pdfjsLib.GlobalWorkerOptions.workerSrc =
-      "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/legacy/build/pdf.worker.min.js";
+      "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.worker.min.js";
   </script>
 
   <!-- SheetJS — usado para gerar/ler as planilhas de importação e exportação -->

@@ -29,9 +29,17 @@ async function renderizarCadastroSimples(area, nomeColecao, rotuloSingular, opco
   async function carregarPagina(limpar = false) {
     const lista = document.getElementById("lista-registros");
     if (limpar) lista.innerHTML = "";
-    const registros = await paginador.carregarProximaPagina();
-    registros.forEach((registro) => lista.appendChild(criarCartaoSimples(registro)));
-    document.getElementById("btn-carregar-mais").classList.toggle("oculto", !paginador.temMais);
+    try {
+      const registros = await paginador.carregarProximaPagina();
+      registros.forEach((registro) => lista.appendChild(criarCartaoSimples(registro)));
+      document.getElementById("btn-carregar-mais").classList.toggle("oculto", !paginador.temMais);
+      if (limpar && registros.length === 0) {
+        lista.innerHTML = `<p class="texto-secundario">Nenhum registro encontrado.</p>`;
+      }
+    } catch (erro) {
+      tratarErroConsultaFirestore(erro);
+      document.getElementById("btn-carregar-mais").classList.add("oculto");
+    }
   }
 
   function criarCartaoSimples(registro) {
@@ -137,16 +145,23 @@ async function renderizarCadastroSimples(area, nomeColecao, rotuloSingular, opco
         carregarPagina(true);
         return;
       }
-      const snapshot = await colecaoEntidade(nomeColecao)
-        .orderBy("nomeNormalizado")
-        .startAt(termo)
-        .endAt(termo + "\uf8ff")
-        .limit(TAMANHO_PAGINA)
-        .get();
-      snapshot.docs.forEach((doc) =>
-        lista.appendChild(criarCartaoSimples({ id: doc.id, ...doc.data() }))
-      );
-      document.getElementById("btn-carregar-mais").classList.add("oculto");
+      try {
+        const snapshot = await colecaoEntidade(nomeColecao)
+          .orderBy("nomeNormalizado")
+          .startAt(termo)
+          .endAt(termo + "\uf8ff")
+          .limit(TAMANHO_PAGINA)
+          .get();
+        snapshot.docs.forEach((doc) =>
+          lista.appendChild(criarCartaoSimples({ id: doc.id, ...doc.data() }))
+        );
+        if (snapshot.empty) {
+          lista.innerHTML = `<p class="texto-secundario">Nenhum resultado encontrado.</p>`;
+        }
+        document.getElementById("btn-carregar-mais").classList.add("oculto");
+      } catch (erro) {
+        tratarErroConsultaFirestore(erro);
+      }
     }, 300);
   });
 
@@ -243,9 +258,17 @@ async function renderizarCredores(area) {
   async function carregarPagina(limpar = false) {
     const lista = document.getElementById("lista-registros");
     if (limpar) lista.innerHTML = "";
-    const registros = await paginador.carregarProximaPagina();
-    registros.forEach((registro) => lista.appendChild(criarCartaoCredor(registro)));
-    document.getElementById("btn-carregar-mais").classList.toggle("oculto", !paginador.temMais);
+    try {
+      const registros = await paginador.carregarProximaPagina();
+      registros.forEach((registro) => lista.appendChild(criarCartaoCredor(registro)));
+      document.getElementById("btn-carregar-mais").classList.toggle("oculto", !paginador.temMais);
+      if (limpar && registros.length === 0) {
+        lista.innerHTML = `<p class="texto-secundario">Nenhum registro encontrado.</p>`;
+      }
+    } catch (erro) {
+      tratarErroConsultaFirestore(erro);
+      document.getElementById("btn-carregar-mais").classList.add("oculto");
+    }
   }
 
   function criarCartaoCredor(registro) {
@@ -357,14 +380,21 @@ async function renderizarCredores(area) {
         carregarPagina(true);
         return;
       }
-      const snapshot = await colecaoEntidade("credores")
-        .orderBy("nomeNormalizado")
-        .startAt(termo)
-        .endAt(termo + "\uf8ff")
-        .limit(TAMANHO_PAGINA)
-        .get();
-      snapshot.docs.forEach((doc) => lista.appendChild(criarCartaoCredor({ id: doc.id, ...doc.data() })));
-      document.getElementById("btn-carregar-mais").classList.add("oculto");
+      try {
+        const snapshot = await colecaoEntidade("credores")
+          .orderBy("nomeNormalizado")
+          .startAt(termo)
+          .endAt(termo + "\uf8ff")
+          .limit(TAMANHO_PAGINA)
+          .get();
+        snapshot.docs.forEach((doc) => lista.appendChild(criarCartaoCredor({ id: doc.id, ...doc.data() })));
+        if (snapshot.empty) {
+          lista.innerHTML = `<p class="texto-secundario">Nenhum resultado encontrado.</p>`;
+        }
+        document.getElementById("btn-carregar-mais").classList.add("oculto");
+      } catch (erro) {
+        tratarErroConsultaFirestore(erro);
+      }
     }, 300);
   });
 

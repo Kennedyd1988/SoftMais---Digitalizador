@@ -54,6 +54,23 @@ function formatarData(dataIso) {
   return `${dia}/${mes}/${ano}`;
 }
 
+/**
+ * Trata erros de consulta ao Firestore de forma visível ao usuário —
+ * antes disso, uma consulta que falhasse (ex: por falta de índice
+ * composto) deixava a tela em branco sem nenhum aviso.
+ */
+function tratarErroConsultaFirestore(erro) {
+  console.error("Erro ao consultar o Firestore:", erro);
+  if (erro?.message?.includes("requires an index") || erro?.code === "failed-precondition") {
+    mostrarToast(
+      "Essa consulta precisa de um índice novo no Firestore. Veja o link no Console do navegador (F12) para criá-lo.",
+      "erro"
+    );
+  } else {
+    mostrarToast("Erro ao carregar a lista. Tente novamente.", "erro");
+  }
+}
+
 /** Botão de ação com estado "processando..." — evita tela parada sem feedback */
 async function executarComFeedback(botao, funcaoAssincrona, textoProcessando = "Salvando...") {
   const textoOriginal = botao.textContent;

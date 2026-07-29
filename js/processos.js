@@ -88,9 +88,17 @@ async function renderizarLicitacoes(area) {
   async function carregarPagina(limpar = false) {
     const lista = document.getElementById("lista-registros");
     if (limpar) lista.innerHTML = "";
-    const registros = await paginador.carregarProximaPagina();
-    registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
-    document.getElementById("btn-carregar-mais").classList.toggle("oculto", !paginador.temMais);
+    try {
+      const registros = await paginador.carregarProximaPagina();
+      registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
+      document.getElementById("btn-carregar-mais").classList.toggle("oculto", !paginador.temMais);
+      if (limpar && registros.length === 0) {
+        lista.innerHTML = `<p class="texto-secundario">Nenhum registro encontrado.</p>`;
+      }
+    } catch (erro) {
+      tratarErroConsultaFirestore(erro);
+      document.getElementById("btn-carregar-mais").classList.add("oculto");
+    }
   }
 
   function criarCartao(registro) {
@@ -288,9 +296,17 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
   async function carregarPagina(limpar = false) {
     const lista = document.getElementById("lista-registros");
     if (limpar) lista.innerHTML = "";
-    const registros = await paginador.carregarProximaPagina();
-    registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
-    document.getElementById("btn-carregar-mais").classList.toggle("oculto", !paginador.temMais);
+    try {
+      const registros = await paginador.carregarProximaPagina();
+      registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
+      document.getElementById("btn-carregar-mais").classList.toggle("oculto", !paginador.temMais);
+      if (limpar && registros.length === 0) {
+        lista.innerHTML = `<p class="texto-secundario">Nenhum registro encontrado.</p>`;
+      }
+    } catch (erro) {
+      tratarErroConsultaFirestore(erro);
+      document.getElementById("btn-carregar-mais").classList.add("oculto");
+    }
   }
 
   function criarCartao(registro) {
@@ -567,9 +583,17 @@ async function renderizarDespesas(area) {
   async function carregarPagina(limpar = false) {
     const lista = document.getElementById("lista-registros");
     if (limpar) lista.innerHTML = "";
-    const registros = await paginador.carregarProximaPagina();
-    registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
-    document.getElementById("btn-carregar-mais").classList.toggle("oculto", !paginador.temMais);
+    try {
+      const registros = await paginador.carregarProximaPagina();
+      registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
+      document.getElementById("btn-carregar-mais").classList.toggle("oculto", !paginador.temMais);
+      if (limpar && registros.length === 0) {
+        lista.innerHTML = `<p class="texto-secundario">Nenhum registro encontrado.</p>`;
+      }
+    } catch (erro) {
+      tratarErroConsultaFirestore(erro);
+      document.getElementById("btn-carregar-mais").classList.add("oculto");
+    }
   }
 
   function criarCartao(registro) {
@@ -808,31 +832,35 @@ function configurarBuscaMultiCampoDespesas(paginador, carregarPagina, criarCarta
       }
 
       const campos = ["numeroEmpenhoNormalizado", "credorNomeNormalizado", "objetoNormalizado"];
-      const resultadosPorConsulta = await Promise.all(
-        campos.map((campo) =>
-          colecaoEntidade("processosDespesa")
-            .orderBy(campo)
-            .startAt(termo)
-            .endAt(termo + "\uf8ff")
-            .limit(TAMANHO_PAGINA)
-            .get()
-        )
-      );
+      try {
+        const resultadosPorConsulta = await Promise.all(
+          campos.map((campo) =>
+            colecaoEntidade("processosDespesa")
+              .orderBy(campo)
+              .startAt(termo)
+              .endAt(termo + "\uf8ff")
+              .limit(TAMANHO_PAGINA)
+              .get()
+          )
+        );
 
-      const encontrados = new Map();
-      resultadosPorConsulta.forEach((snapshot) => {
-        snapshot.docs.forEach((doc) => {
-          if (!encontrados.has(doc.id)) {
-            encontrados.set(doc.id, { id: doc.id, ...doc.data() });
-          }
+        const encontrados = new Map();
+        resultadosPorConsulta.forEach((snapshot) => {
+          snapshot.docs.forEach((doc) => {
+            if (!encontrados.has(doc.id)) {
+              encontrados.set(doc.id, { id: doc.id, ...doc.data() });
+            }
+          });
         });
-      });
 
-      encontrados.forEach((registro) => lista.appendChild(criarCartao(registro)));
-      if (encontrados.size === 0) {
-        lista.innerHTML = `<p class="texto-secundario">Nenhum resultado encontrado.</p>`;
+        encontrados.forEach((registro) => lista.appendChild(criarCartao(registro)));
+        if (encontrados.size === 0) {
+          lista.innerHTML = `<p class="texto-secundario">Nenhum resultado encontrado.</p>`;
+        }
+        document.getElementById("btn-carregar-mais").classList.add("oculto");
+      } catch (erro) {
+        tratarErroConsultaFirestore(erro);
       }
-      document.getElementById("btn-carregar-mais").classList.add("oculto");
     }, 300);
   });
 }
@@ -908,14 +936,21 @@ function configurarBuscaGenerica(nomeColecao, criarCartao, paginador, carregarPa
         carregarPagina(true);
         return;
       }
-      const snapshot = await colecaoEntidade(nomeColecao)
-        .orderBy(campoNormalizado)
-        .startAt(termo)
-        .endAt(termo + "\uf8ff")
-        .limit(TAMANHO_PAGINA)
-        .get();
-      snapshot.docs.forEach((doc) => lista.appendChild(criarCartao({ id: doc.id, ...doc.data() })));
-      document.getElementById("btn-carregar-mais").classList.add("oculto");
+      try {
+        const snapshot = await colecaoEntidade(nomeColecao)
+          .orderBy(campoNormalizado)
+          .startAt(termo)
+          .endAt(termo + "\uf8ff")
+          .limit(TAMANHO_PAGINA)
+          .get();
+        snapshot.docs.forEach((doc) => lista.appendChild(criarCartao({ id: doc.id, ...doc.data() })));
+        if (snapshot.empty) {
+          lista.innerHTML = `<p class="texto-secundario">Nenhum resultado encontrado.</p>`;
+        }
+        document.getElementById("btn-carregar-mais").classList.add("oculto");
+      } catch (erro) {
+        tratarErroConsultaFirestore(erro);
+      }
     }, 300);
   });
 }

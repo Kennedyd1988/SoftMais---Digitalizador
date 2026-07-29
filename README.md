@@ -121,12 +121,22 @@ Documentos Diversos, seguindo o padrão do projeto:
 
 ## Changelog
 
+**v1.3** — Novos campos: Processo de Despesa ganhou "Ordem de Pagamento"
+e "Elemento de Despesa" (validado no formato 9.9.99.99.99); Unidade
+Orçamentária e Fonte de Recurso ganharam campo "Código", exibido também
+nos seletores desses cadastros dentro do formulário de despesa. Todos
+refletidos na planilha modelo, importação e exportação de despesas.
+Também padronizados os ícones de editar/excluir na listagem de
+Licitações, Despesas, Legislação e Documentos Diversos (mesmo padrão
+visual do Credor).
+
 **v1.2** — Padronização visual com a identidade oficial SOFT+: logo real
 (`logo-horizontal.png` na tela de login, `logo-simbolo.png` no cabeçalho),
 ícones do PWA reais, mesma paleta de cores e tipografia (Inter, Source
 Serif 4, IBM Plex Mono) usada nos demais apps da marca. Corrigido também
-o carregamento do PDF.js (a versão 4 exige a build "legacy" para expor a
-variável global `pdfjsLib` em `<script>` comum, sem módulos ES).
+o carregamento do PDF.js (versão trocada para 3.11.174, já que a partir
+da v4 a biblioteca virou 100% módulo ES e não expõe mais a variável
+global `pdfjsLib` em `<script>` comum).
 
 **v1.1** — Adicionada importação/exportação de planilhas XLSX para
 Credores, Licitações, Processos de Despesa, Legislação e Documentos

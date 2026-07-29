@@ -10,7 +10,7 @@ async function carregarOpcoesSelect(nomeColecao) {
 
 function montarOpcoesHtml(lista, idSelecionado) {
   return lista
-    .map((item) => `<option value="${item.id}" ${item.id === idSelecionado ? "selected" : ""}>${item.nome}</option>`)
+    .map((item) => `<option value="${item.id}" ${item.id === idSelecionado ? "selected" : ""}>${item.codigo ? item.codigo + " — " : ""}${item.nome}</option>`)
     .join("");
 }
 
@@ -84,15 +84,30 @@ async function renderizarLicitacoes(area) {
 
   function criarCartao(registro) {
     const cartao = document.createElement("div");
-    cartao.className = "cartao-registro cartao-clicavel";
+    cartao.className = "cartao-registro";
     cartao.innerHTML = `
       <div>
         <strong>${registro.numero}/${registro.ano}</strong> — ${mapaModalidades[registro.modalidadeId] || "Modalidade não informada"}
         <div class="texto-secundario">${registro.objeto}</div>
         <div class="texto-secundario">${(registro.anexos || []).length} anexo(s)</div>
       </div>
+      ${
+        usuarioPodeEditar()
+          ? `<div class="acoes-cartao">
+               <button class="botao-icone" data-acao="editar">✏️</button>
+               <button class="botao-icone" data-acao="excluir">🗑️</button>
+             </div>`
+          : ""
+      }
     `;
-    cartao.addEventListener("click", () => abrirFormulario(registro));
+    cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", () => abrirFormulario(registro));
+    cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) =>
+      excluirLicitacao(registro, evento.target)
+    );
+    if (!usuarioPodeEditar()) {
+      cartao.classList.add("cartao-clicavel");
+      cartao.addEventListener("click", () => abrirFormulario(registro));
+    }
     return cartao;
   }
 
@@ -254,15 +269,30 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
 
   function criarCartao(registro) {
     const cartao = document.createElement("div");
-    cartao.className = "cartao-registro cartao-clicavel";
+    cartao.className = "cartao-registro";
     cartao.innerHTML = `
       <div>
         <strong>${mapaTipos[registro.tipoId] || "Tipo não informado"} nº ${registro.numero}</strong>
         <div class="texto-secundario">${registro.objeto}</div>
         <div class="texto-secundario">${(registro.anexos || []).length} anexo(s)</div>
       </div>
+      ${
+        usuarioPodeEditar()
+          ? `<div class="acoes-cartao">
+               <button class="botao-icone" data-acao="editar">✏️</button>
+               <button class="botao-icone" data-acao="excluir">🗑️</button>
+             </div>`
+          : ""
+      }
     `;
-    cartao.addEventListener("click", () => abrirFormulario(registro));
+    cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", () => abrirFormulario(registro));
+    cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) =>
+      excluirRegistroModulo(registro, evento.target)
+    );
+    if (!usuarioPodeEditar()) {
+      cartao.classList.add("cartao-clicavel");
+      cartao.addEventListener("click", () => abrirFormulario(registro));
+    }
     return cartao;
   }
 
@@ -395,6 +425,8 @@ async function renderizarDespesas(area) {
 
     const colunasDespesas = [
       { chave: "numeroEmpenho", rotulo: "Número do Empenho", obrigatorio: true, exemplo: "0123/2026" },
+      { chave: "ordemPagamento", rotulo: "Ordem de Pagamento", obrigatorio: true, exemplo: "045/2026" },
+      { chave: "elementoDespesa", rotulo: "Elemento de Despesa", obrigatorio: true, exemplo: "3.3.90.30.00", ajuda: "Formato: 9.9.99.99.99 (ex: 3.3.90.30.00)." },
       { chave: "documentoCredor", rotulo: "CPF/CNPJ do Credor", obrigatorio: true, exemplo: credoresCompletos[0]?.documento || "12.345.678/0001-90", ajuda: "O credor precisa já estar cadastrado em Credores/Fornecedores." },
       { chave: "unidadeOrcamentaria", rotulo: "Unidade Orçamentária", obrigatorio: true, exemplo: unidadesOrc[0]?.nome || "Secretaria de Administração" },
       { chave: "fonteRecurso", rotulo: "Fonte de Recurso", obrigatorio: true, exemplo: fontesRecurso[0]?.nome || "Recursos Próprios" },
@@ -404,6 +436,8 @@ async function renderizarDespesas(area) {
       { chave: "valor", rotulo: "Valor", obrigatorio: true, exemplo: "1500.00" },
     ];
 
+    const padraoElementoDespesaImportacao = /^\d\.\d\.\d{2}\.\d{2}\.\d{2}$/;
+
     adicionarBotoesImportExport(document.getElementById("acoes-cabecalho"), {
       titulo: "Processos de Despesa",
       nomeColecao: "processosDespesa",
@@ -411,6 +445,15 @@ async function renderizarDespesas(area) {
       montarDocumento: async (linha) => {
         const numeroEmpenho = (linha["Número do Empenho"] || "").toString().trim();
         if (!numeroEmpenho) throw new Error("Número do Empenho é obrigatório.");
+
+        const ordemPagamento = (linha["Ordem de Pagamento"] || "").toString().trim();
+        if (!ordemPagamento) throw new Error("Ordem de Pagamento é obrigatória.");
+
+        const elementoDespesa = (linha["Elemento de Despesa"] || "").toString().trim();
+        if (!elementoDespesa) throw new Error("Elemento de Despesa é obrigatório.");
+        if (!padraoElementoDespesaImportacao.test(elementoDespesa)) {
+          throw new Error(`Elemento de Despesa "${elementoDespesa}" fora do formato esperado (9.9.99.99.99).`);
+        }
 
         const documentoBruto = (linha["CPF/CNPJ do Credor"] || "").toString().trim();
         if (!documentoBruto) throw new Error("CPF/CNPJ do Credor é obrigatório.");
@@ -444,6 +487,8 @@ async function renderizarDespesas(area) {
 
         return {
           numeroEmpenho,
+          ordemPagamento,
+          elementoDespesa,
           credorId: credor.id,
           credorNome: credor.nome,
           unidadeOrcamentariaId,
@@ -461,6 +506,8 @@ async function renderizarDespesas(area) {
       },
       montarLinhaExportacao: async (registro) => ({
         "Número do Empenho": registro.numeroEmpenho || "",
+        "Ordem de Pagamento": registro.ordemPagamento || "",
+        "Elemento de Despesa": registro.elementoDespesa || "",
         "CPF/CNPJ do Credor": mapaCredorPorId[registro.credorId]?.documento || "",
         "Unidade Orçamentária": mapaUnidadeOrcPorId[registro.unidadeOrcamentariaId] || "",
         "Fonte de Recurso": mapaFontePorId[registro.fonteRecursoId] || "",
@@ -483,16 +530,32 @@ async function renderizarDespesas(area) {
 
   function criarCartao(registro) {
     const cartao = document.createElement("div");
-    cartao.className = "cartao-registro cartao-clicavel";
+    cartao.className = "cartao-registro";
     cartao.innerHTML = `
       <div>
         <strong>Empenho ${registro.numeroEmpenho}</strong> — ${registro.credorNome || ""}
         <div class="texto-secundario">${registro.objeto}</div>
         <div class="texto-secundario">${formatarMoeda(registro.valor)} · Pagamento em ${formatarData(registro.dataPagamento)}</div>
+        <div class="texto-secundario">Ordem de Pagamento: ${registro.ordemPagamento || "-"} · Elemento: <span class="num">${registro.elementoDespesa || "-"}</span></div>
         <div class="texto-secundario">${(registro.anexos || []).length} anexo(s)</div>
       </div>
+      ${
+        usuarioPodeEditar()
+          ? `<div class="acoes-cartao">
+               <button class="botao-icone" data-acao="editar">✏️</button>
+               <button class="botao-icone" data-acao="excluir">🗑️</button>
+             </div>`
+          : ""
+      }
     `;
-    cartao.addEventListener("click", () => abrirFormulario(registro));
+    cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", () => abrirFormulario(registro));
+    cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) =>
+      excluirDespesa(registro, evento.target)
+    );
+    if (!usuarioPodeEditar()) {
+      cartao.classList.add("cartao-clicavel");
+      cartao.addEventListener("click", () => abrirFormulario(registro));
+    }
     return cartao;
   }
 
@@ -500,6 +563,17 @@ async function renderizarDespesas(area) {
     const modal = criarModal(`${registro ? "Editar" : "Novo"} Processo de Despesa`, `
       <label>Número do Empenho *</label>
       <input type="text" id="campo-numero-empenho" value="${registro?.numeroEmpenho || ""}">
+
+      <div class="linha-formulario">
+        <div>
+          <label>Ordem de Pagamento *</label>
+          <input type="text" id="campo-ordem-pagamento" value="${registro?.ordemPagamento || ""}">
+        </div>
+        <div>
+          <label>Elemento de Despesa *</label>
+          <input type="text" id="campo-elemento-despesa" placeholder="Ex: 3.3.90.30.00" value="${registro?.elementoDespesa || ""}">
+        </div>
+      </div>
 
       <label>Credor/Fornecedor *</label>
       <input type="text" id="campo-credor-busca" placeholder="Digite para buscar..." value="${registro?.credorNome || ""}" autocomplete="off">
@@ -545,6 +619,8 @@ async function renderizarDespesas(area) {
       <div id="secao-anexos"></div>
     `, async (botaoSalvar) => {
       const campoNumeroEmpenho = document.getElementById("campo-numero-empenho");
+      const campoOrdemPagamento = document.getElementById("campo-ordem-pagamento");
+      const campoElementoDespesa = document.getElementById("campo-elemento-despesa");
       const campoCredorId = document.getElementById("campo-credor-id");
       const campoUnidadeOrc = document.getElementById("campo-unidade-orc");
       const campoFonteRecurso = document.getElementById("campo-fonte-recurso");
@@ -552,11 +628,20 @@ async function renderizarDespesas(area) {
       const campoDataPagamento = document.getElementById("campo-data-pagamento");
       const campoValor = document.getElementById("campo-valor");
 
-      [campoNumeroEmpenho, campoUnidadeOrc, campoFonteRecurso, campoObjeto, campoDataPagamento, campoValor]
+      [campoNumeroEmpenho, campoOrdemPagamento, campoElementoDespesa, campoUnidadeOrc, campoFonteRecurso, campoObjeto, campoDataPagamento, campoValor]
         .forEach(limparCampoInvalido);
 
       let valido = true;
       if (!campoNumeroEmpenho.value.trim()) { marcarCampoInvalido(campoNumeroEmpenho, "Informe o número do empenho."); valido = false; }
+      if (!campoOrdemPagamento.value.trim()) { marcarCampoInvalido(campoOrdemPagamento, "Informe a ordem de pagamento."); valido = false; }
+      const padraoElementoDespesa = /^\d\.\d\.\d{2}\.\d{2}\.\d{2}$/;
+      if (!campoElementoDespesa.value.trim()) {
+        marcarCampoInvalido(campoElementoDespesa, "Informe o elemento de despesa.");
+        valido = false;
+      } else if (!padraoElementoDespesa.test(campoElementoDespesa.value.trim())) {
+        marcarCampoInvalido(campoElementoDespesa, "Formato esperado: 9.9.99.99.99 (ex: 3.3.90.30.00).");
+        valido = false;
+      }
       if (!campoCredorId.value) { marcarCampoInvalido(document.getElementById("campo-credor-busca"), "Selecione um credor da lista."); valido = false; }
       if (!campoUnidadeOrc.value) { marcarCampoInvalido(campoUnidadeOrc, "Selecione a unidade orçamentária."); valido = false; }
       if (!campoFonteRecurso.value) { marcarCampoInvalido(campoFonteRecurso, "Selecione a fonte de recurso."); valido = false; }
@@ -568,6 +653,8 @@ async function renderizarDespesas(area) {
       await executarComFeedback(botaoSalvar, async () => {
         const dados = {
           numeroEmpenho: campoNumeroEmpenho.value.trim(),
+          ordemPagamento: campoOrdemPagamento.value.trim(),
+          elementoDespesa: campoElementoDespesa.value.trim(),
           credorId: campoCredorId.value,
           credorNome: document.getElementById("campo-credor-busca").value.trim(),
           unidadeOrcamentariaId: campoUnidadeOrc.value,

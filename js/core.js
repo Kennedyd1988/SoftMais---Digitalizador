@@ -333,10 +333,14 @@ function navegarPara(chave) {
       renderizarCadastroSimples(area, "modalidadesLicitacao", "Modalidade de Licitação");
       break;
     case "unidades-orcamentarias":
-      renderizarCadastroSimples(area, "unidadesOrcamentarias", "Unidade Orçamentária");
+      renderizarCadastroSimples(area, "unidadesOrcamentarias", "Unidade Orçamentária", {
+        rotulo: "Código", exemplo: "10000", obrigatorio: true,
+      });
       break;
     case "fontes-recurso":
-      renderizarCadastroSimples(area, "fontesRecurso", "Fonte de Recurso");
+      renderizarCadastroSimples(area, "fontesRecurso", "Fonte de Recurso", {
+        rotulo: "Código", exemplo: "1.500.0000", obrigatorio: true,
+      });
       break;
     case "tipos-documento":
       renderizarCadastroSimples(area, "tiposDocumento", "Tipo de Documento");

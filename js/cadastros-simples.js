@@ -6,7 +6,10 @@
 // "nome"), por isso usam essa mesma função genérica em vez de repetir
 // código 4 vezes.
 
-async function renderizarCadastroSimples(area, nomeColecao, rotuloSingular) {
+async function renderizarCadastroSimples(area, nomeColecao, rotuloSingular, opcoesCampoCodigo = null) {
+  // opcoesCampoCodigo, quando informado, ativa um campo extra "Código"
+  // (usado hoje por Unidade Orçamentária e Fonte de Recurso). Formato:
+  // { rotulo: "Código", exemplo: "10000", obrigatorio: true }
   area.innerHTML = `
     <div class="cabecalho-pagina">
       <h2>${rotuloSingular}s</h2>
@@ -35,7 +38,7 @@ async function renderizarCadastroSimples(area, nomeColecao, rotuloSingular) {
     const cartao = document.createElement("div");
     cartao.className = "cartao-registro";
     cartao.innerHTML = `
-      <span>${registro.nome}</span>
+      <span>${opcoesCampoCodigo && registro.codigo ? `<span class="num">${registro.codigo}</span> — ` : ""}${registro.nome}</span>
       ${
         usuarioPodeEditar()
           ? `<div class="acoes-cartao">
@@ -56,20 +59,37 @@ async function renderizarCadastroSimples(area, nomeColecao, rotuloSingular) {
 
   function abrirFormulario(registro = null) {
     const nomeAtual = registro?.nome || "";
+    const codigoAtual = registro?.codigo || "";
     const modal = criarModal(`${registro ? "Editar" : "Novo"} ${rotuloSingular}`, `
+      ${
+        opcoesCampoCodigo
+          ? `<label>${opcoesCampoCodigo.rotulo} ${opcoesCampoCodigo.obrigatorio ? "*" : ""}</label>
+             <input type="text" id="campo-codigo" placeholder="Ex: ${opcoesCampoCodigo.exemplo}" value="${codigoAtual}">`
+          : ""
+      }
       <label>Nome *</label>
       <input type="text" id="campo-nome" value="${nomeAtual.replace(/"/g, "&quot;")}">
     `, async (botaoSalvar) => {
       const campoNome = document.getElementById("campo-nome");
+      const campoCodigo = document.getElementById("campo-codigo");
       limparCampoInvalido(campoNome);
+      if (campoCodigo) limparCampoInvalido(campoCodigo);
+
       const nome = campoNome.value.trim();
+      let valido = true;
       if (!nome) {
         marcarCampoInvalido(campoNome, "Informe o nome.");
-        return;
+        valido = false;
       }
+      if (opcoesCampoCodigo?.obrigatorio && campoCodigo && !campoCodigo.value.trim()) {
+        marcarCampoInvalido(campoCodigo, `Informe o ${opcoesCampoCodigo.rotulo.toLowerCase()}.`);
+        valido = false;
+      }
+      if (!valido) return;
 
       await executarComFeedback(botaoSalvar, async () => {
         const dados = { nome, nomeNormalizado: normalizarTexto(nome) };
+        if (campoCodigo) dados.codigo = campoCodigo.value.trim();
         if (registro) {
           await colecaoEntidade(nomeColecao).doc(registro.id).update(dados);
         } else {

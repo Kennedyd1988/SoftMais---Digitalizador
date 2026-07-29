@@ -121,6 +121,13 @@ Documentos Diversos, seguindo o padrão do projeto:
 
 ## Changelog
 
+**v1.7** — Corrigida lentidão no carregamento da lista de Processos de
+Despesa: a tela estava baixando a coleção inteira de Credores e de
+Licitações toda vez que era aberta (só pra montar a planilha de
+importação/exportação), mesmo que o usuário só quisesse ver a lista.
+Agora essa busca só acontece de verdade quando o botão Importar ou
+Exportar é clicado, e fica em cache pro resto da visita à página.
+
 **v1.6** — A busca de Processos de Despesa estava cobrindo só três dos
 quatro campos prometidos: número do empenho, credor e objeto — faltava
 **Ordem de Pagamento**. Corrigido, agora busca nos quatro. Mesma

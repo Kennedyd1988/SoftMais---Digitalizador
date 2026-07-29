@@ -458,34 +458,43 @@ async function renderizarDespesas(area) {
     carregarOpcoesSelect("fontesRecurso"),
   ]);
 
-  if (usuarioPodeEditar()) {
-    // Carrega credores e licitações por completo só neste momento (ação
-    // explícita de configurar importação/exportação, não é carregamento
-    // automático de lista — por isso é aceitável trazer tudo de uma vez).
+  // Credores e licitações completos só são baixados quando o usuário
+  // realmente clica em Importar ou Exportar — não no carregamento da
+  // página, que deve mostrar a lista rápido independente do tamanho
+  // dessas outras coleções. O resultado fica em cache (memoizado) pra
+  // não buscar de novo se a pessoa importar e exportar na mesma visita.
+  let dadosAuxiliaresDespesaCache = null;
+  async function obterDadosAuxiliaresDespesa() {
+    if (dadosAuxiliaresDespesaCache) return dadosAuxiliaresDespesaCache;
     const [credoresSnapshot, licitacoesSnapshot] = await Promise.all([
       colecaoEntidade("credores").get(),
       colecaoEntidade("licitacoes").get(),
     ]);
     const credoresCompletos = credoresSnapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
     const licitacoesCompletas = licitacoesSnapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+    dadosAuxiliaresDespesaCache = {
+      mapaCredorPorDocumento: Object.fromEntries(
+        credoresCompletos.map((c) => [normalizarDocumento(c.documento), c])
+      ),
+      mapaCredorPorId: Object.fromEntries(credoresCompletos.map((c) => [c.id, c])),
+      mapaLicitacaoPorIdentificador: Object.fromEntries(
+        licitacoesCompletas.map((l) => [`${l.numero}/${l.ano}`, l.id])
+      ),
+    };
+    return dadosAuxiliaresDespesaCache;
+  }
 
-    const mapaCredorPorDocumento = Object.fromEntries(
-      credoresCompletos.map((c) => [normalizarDocumento(c.documento), c])
-    );
-    const mapaCredorPorId = Object.fromEntries(credoresCompletos.map((c) => [c.id, c]));
+  if (usuarioPodeEditar()) {
     const mapaUnidadeOrcPorNome = Object.fromEntries(unidadesOrc.map((u) => [normalizarTexto(u.nome), u.id]));
     const mapaUnidadeOrcPorId = Object.fromEntries(unidadesOrc.map((u) => [u.id, u.nome]));
     const mapaFontePorNome = Object.fromEntries(fontesRecurso.map((f) => [normalizarTexto(f.nome), f.id]));
     const mapaFontePorId = Object.fromEntries(fontesRecurso.map((f) => [f.id, f.nome]));
-    const mapaLicitacaoPorIdentificador = Object.fromEntries(
-      licitacoesCompletas.map((l) => [`${l.numero}/${l.ano}`, l.id])
-    );
 
     const colunasDespesas = [
       { chave: "numeroEmpenho", rotulo: "Número do Empenho", obrigatorio: true, exemplo: "0123/2026" },
       { chave: "ordemPagamento", rotulo: "Ordem de Pagamento", obrigatorio: true, exemplo: "045/2026" },
       { chave: "elementoDespesa", rotulo: "Elemento de Despesa", obrigatorio: true, exemplo: "3.3.90.30.00", ajuda: "Formato: 9.9.99.99.99 (ex: 3.3.90.30.00)." },
-      { chave: "documentoCredor", rotulo: "CPF/CNPJ do Credor", obrigatorio: true, exemplo: credoresCompletos[0]?.documento || "12.345.678/0001-90", ajuda: "O credor precisa já estar cadastrado em Credores/Fornecedores." },
+      { chave: "documentoCredor", rotulo: "CPF/CNPJ do Credor", obrigatorio: true, exemplo: "12.345.678/0001-90", ajuda: "O credor precisa já estar cadastrado em Credores/Fornecedores." },
       { chave: "unidadeOrcamentaria", rotulo: "Unidade Orçamentária", obrigatorio: true, exemplo: unidadesOrc[0]?.nome || "Secretaria de Administração" },
       { chave: "fonteRecurso", rotulo: "Fonte de Recurso", obrigatorio: true, exemplo: fontesRecurso[0]?.nome || "Recursos Próprios" },
       { chave: "licitacao", rotulo: "Licitação de Origem (número/ano)", obrigatorio: false, exemplo: "", ajuda: "Opcional. Preencha no formato número/ano, ex: 015/2026." },
@@ -501,6 +510,8 @@ async function renderizarDespesas(area) {
       nomeColecao: "processosDespesa",
       colunas: colunasDespesas,
       montarDocumento: async (linha) => {
+        const { mapaCredorPorDocumento, mapaLicitacaoPorIdentificador } = await obterDadosAuxiliaresDespesa();
+
         const numeroEmpenho = (linha["Número do Empenho"] || "").toString().trim();
         if (!numeroEmpenho) throw new Error("Número do Empenho é obrigatório.");
 
@@ -565,18 +576,21 @@ async function renderizarDespesas(area) {
           criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
         };
       },
-      montarLinhaExportacao: async (registro) => ({
-        "Número do Empenho": registro.numeroEmpenho || "",
-        "Ordem de Pagamento": registro.ordemPagamento || "",
-        "Elemento de Despesa": registro.elementoDespesa || "",
-        "CPF/CNPJ do Credor": mapaCredorPorId[registro.credorId]?.documento || "",
-        "Unidade Orçamentária": mapaUnidadeOrcPorId[registro.unidadeOrcamentariaId] || "",
-        "Fonte de Recurso": mapaFontePorId[registro.fonteRecursoId] || "",
-        "Licitação de Origem (número/ano)": registro.licitacaoIdentificador || "",
-        "Objeto": registro.objeto || "",
-        "Data de Pagamento (dd/mm/aaaa)": formatarData(registro.dataPagamento),
-        "Valor": registro.valor || 0,
-      }),
+      montarLinhaExportacao: async (registro) => {
+        const { mapaCredorPorId } = await obterDadosAuxiliaresDespesa();
+        return {
+          "Número do Empenho": registro.numeroEmpenho || "",
+          "Ordem de Pagamento": registro.ordemPagamento || "",
+          "Elemento de Despesa": registro.elementoDespesa || "",
+          "CPF/CNPJ do Credor": mapaCredorPorId[registro.credorId]?.documento || "",
+          "Unidade Orçamentária": mapaUnidadeOrcPorId[registro.unidadeOrcamentariaId] || "",
+          "Fonte de Recurso": mapaFontePorId[registro.fonteRecursoId] || "",
+          "Licitação de Origem (número/ano)": registro.licitacaoIdentificador || "",
+          "Objeto": registro.objeto || "",
+          "Data de Pagamento (dd/mm/aaaa)": formatarData(registro.dataPagamento),
+          "Valor": registro.valor || 0,
+        };
+      },
       aoImportarComSucesso: () => { paginador.reiniciar(); carregarPagina(true); },
     });
   }

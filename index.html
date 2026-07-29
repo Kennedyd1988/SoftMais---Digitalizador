@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>SOFT+ Indexação de Documentos</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0b4f8a">
+  <link rel="icon" href="icons/icone-192.png">
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+
+  <!-- ============== TELA DE LOGIN ============== -->
+  <div id="tela-login" class="tela-login">
+    <div class="caixa-login">
+      <h1>SOFT+ <span class="destaque-marca">Indexação de Documentos</span></h1>
+      <p class="texto-secundario">Entre com seu e-mail e senha cadastrados.</p>
+      <label>E-mail</label>
+      <input type="email" id="login-email" autocomplete="username">
+      <label>Senha</label>
+      <input type="password" id="login-senha" autocomplete="current-password">
+      <button class="botao-primario botao-largura-total" id="btn-entrar">Entrar</button>
+      <div id="erro-login" class="mensagem-erro oculto"></div>
+    </div>
+  </div>
+
+  <!-- ============== APP ============== -->
+  <div id="app-container" class="app-container oculto">
+    <header class="cabecalho-app">
+      <button id="btn-abrir-menu" class="botao-icone-menu">☰</button>
+      <span class="titulo-app">SOFT+ Indexação</span>
+      <select id="seletor-entidade" class="seletor-entidade"></select>
+      <span class="nome-usuario" id="nome-usuario-logado"></span>
+      <button id="btn-instalar-app" class="botao-instalar oculto">⬇️ Instalar app</button>
+      <button id="btn-sair" class="botao-sair">Sair</button>
+    </header>
+
+    <div class="corpo-app">
+      <nav id="menu-lateral" class="menu-lateral"></nav>
+      <main id="area-conteudo" class="area-conteudo"></main>
+    </div>
+  </div>
+
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Firebase (SDK compat, mesmo padrão dos demais apps SOFT+) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+  <!-- PDF.js — usado só para contar páginas do PDF antes do upload -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js";
+  </script>
+
+  <!-- SheetJS — usado para gerar/ler as planilhas de importação e exportação -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <script src="js/firebase-config.js"></script>
+  <script src="js/core.js"></script>
+  <script src="js/drive.js"></script>
+  <script src="js/anexos.js"></script>
+  <script src="js/importacao-exportacao.js"></script>
+  <script src="js/cadastros-simples.js"></script>
+  <script src="js/processos.js"></script>
+  <script src="js/usuarios.js"></script>
+
+  <script>
+    // -------- Login --------
+    document.getElementById("btn-entrar").addEventListener("click", realizarLogin);
+    document.getElementById("login-senha").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") realizarLogin();
+    });
+
+    async function realizarLogin() {
+      const email = document.getElementById("login-email").value.trim();
+      const senha = document.getElementById("login-senha").value;
+      const botao = document.getElementById("btn-entrar");
+      const avisoErro = document.getElementById("erro-login");
+      avisoErro.classList.add("oculto");
+
+      if (!email || !senha) {
+        avisoErro.textContent = "Informe e-mail e senha.";
+        avisoErro.classList.remove("oculto");
+        return;
+      }
+
+      await executarComFeedback(botao, async () => {
+        try {
+          await fazerLogin(email, senha);
+        } catch (erro) {
+          avisoErro.textContent = "E-mail ou senha inválidos.";
+          avisoErro.classList.remove("oculto");
+        }
+      }, "Entrando...");
+    }
+
+    document.getElementById("btn-sair").addEventListener("click", fazerLogout);
+
+    // -------- Menu lateral em telas pequenas --------
+    document.getElementById("btn-abrir-menu").addEventListener("click", () => {
+      document.getElementById("menu-lateral").classList.toggle("menu-aberto");
+    });
+
+    // -------- PWA: instalação --------
+    let eventoInstalacao = null;
+    window.addEventListener("beforeinstallprompt", (evento) => {
+      evento.preventDefault();
+      eventoInstalacao = evento;
+      document.getElementById("btn-instalar-app").classList.remove("oculto");
+    });
+    document.getElementById("btn-instalar-app").addEventListener("click", async () => {
+      if (!eventoInstalacao) return;
+      eventoInstalacao.prompt();
+      await eventoInstalacao.userChoice;
+      eventoInstalacao = null;
+      document.getElementById("btn-instalar-app").classList.add("oculto");
+    });
+
+    // -------- Service Worker (estratégia network-first) --------
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("service-worker.js");
+      });
+    }
+  </script>
+</body>
+</html>

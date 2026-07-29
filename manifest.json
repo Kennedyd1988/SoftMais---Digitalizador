@@ -1,0 +1,14 @@
+{
+  "name": "SOFT+ Indexação de Documentos",
+  "short_name": "SOFT+ Docs",
+  "description": "Indexação e digitalização de processos públicos em PDF",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0b4f8a",
+  "theme_color": "#0b4f8a",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "icons/icone-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icone-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

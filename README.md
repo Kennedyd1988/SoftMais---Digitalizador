@@ -121,6 +121,13 @@ Documentos Diversos, seguindo o padrão do projeto:
 
 ## Changelog
 
+**v1.2** — Padronização visual com a identidade oficial SOFT+: logo real
+(`logo-horizontal.png` na tela de login, `logo-simbolo.png` no cabeçalho),
+ícones do PWA reais, mesma paleta de cores e tipografia (Inter, Source
+Serif 4, IBM Plex Mono) usada nos demais apps da marca. Corrigido também
+o carregamento do PDF.js (a versão 4 exige a build "legacy" para expor a
+variável global `pdfjsLib` em `<script>` comum, sem módulos ES).
+
 **v1.1** — Adicionada importação/exportação de planilhas XLSX para
 Credores, Licitações, Processos de Despesa, Legislação e Documentos
 Diversos, com aba de instruções, exemplo preenchido, resolução de

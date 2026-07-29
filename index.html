@@ -5,8 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <title>SOFT+ Indexação de Documentos</title>
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0b4f8a">
-  <link rel="icon" href="icons/icone-192.png">
+  <meta name="theme-color" content="#0d4fc4">
+  <link rel="icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/estilos.css">
 </head>
 <body>
@@ -14,8 +17,8 @@
   <!-- ============== TELA DE LOGIN ============== -->
   <div id="tela-login" class="tela-login">
     <div class="caixa-login">
-      <h1>SOFT+ <span class="destaque-marca">Indexação de Documentos</span></h1>
-      <p class="texto-secundario">Entre com seu e-mail e senha cadastrados.</p>
+      <img src="logo-horizontal.png" alt="SOFT+" class="logo-login">
+      <p class="texto-secundario">Indexação de Documentos — entre com seu e-mail e senha cadastrados.</p>
       <label>E-mail</label>
       <input type="email" id="login-email" autocomplete="username">
       <label>Senha</label>
@@ -29,7 +32,7 @@
   <div id="app-container" class="app-container oculto">
     <header class="cabecalho-app">
       <button id="btn-abrir-menu" class="botao-icone-menu">☰</button>
-      <span class="titulo-app">SOFT+ Indexação</span>
+      <span class="titulo-app"><img src="logo-simbolo.png" alt="SOFT+" class="simbolo-cabecalho"> Indexação de Documentos</span>
       <select id="seletor-entidade" class="seletor-entidade"></select>
       <span class="nome-usuario" id="nome-usuario-logado"></span>
       <button id="btn-instalar-app" class="botao-instalar oculto">⬇️ Instalar app</button>

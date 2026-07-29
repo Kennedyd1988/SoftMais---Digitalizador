@@ -6,12 +6,12 @@
 // se não tiver um app da Web criado ainda, clique no ícone "</>" pra
 // criar um, e copie o objeto firebaseConfig que aparecer.
 const firebaseConfig = {
-  apiKey: "COLE_AQUI_SUA_API_KEY",
-  authDomain: "SEU_PROJETO.firebaseapp.com",
-  projectId: "SEU_PROJETO_ID",
-  storageBucket: "SEU_PROJETO.appspot.com",
-  messagingSenderId: "SEU_SENDER_ID",
-  appId: "SEU_APP_ID",
+  apiKey: "AIzaSyCX-tC7Via8VFr45wC-nrSdVh38C9q5nTk",
+  authDomain: "softmais-digitalizador.firebaseapp.com",
+  projectId: "softmais-digitalizador",
+  storageBucket: "softmais-digitalizador.firebasestorage.app",
+  messagingSenderId: "563458745236",
+  appId: "1:563458745236:web:932057eedb0bb56c02a581",
 };
 
 // URL da Cloud Function que renova o acesso ao Google Drive.

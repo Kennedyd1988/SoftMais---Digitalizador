@@ -255,6 +255,11 @@ input:focus, select:focus, textarea:focus {
 .tabela-relatorio th { background: var(--ink); color: var(--cinza-texto); font-weight: 600; }
 .tabela-relatorio tr:last-child td { border-bottom: none; }
 
+/* ---------- MANUTENÇÃO ---------- */
+.cartao-manutencao { background: var(--branco); border: 1px solid var(--cinza-borda); border-radius: var(--raio, 10px); padding: 18px; margin-bottom: 16px; max-width: 640px; }
+.cartao-manutencao h3 { margin-top: 0; color: var(--azul-principal); font-size: 15px; }
+.resultado-manutencao { margin-top: 12px; font-size: 14px; }
+
 /* ---------- RESPONSIVO ---------- */
 @media (max-width: 820px) {
   .botao-icone-menu { display: block; }

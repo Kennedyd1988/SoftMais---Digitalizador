@@ -131,7 +131,17 @@ Documentos Diversos, seguindo o padrão do projeto:
 
 ## Changelog
 
-**v1.8** — Adicionado versionamento (`?v=2`) nos arquivos JS/CSS
+**v1.9** — Nova aba **Manutenção** (só administrador): ferramenta de
+reindexação em massa. "Reindexar Processos de Despesa" varre todos os
+registros e recalcula os campos de busca (número do empenho, ordem de
+pagamento, credor, objeto, competência) que ficaram faltando em
+registros cadastrados antes dessas buscas existirem — sem precisar abrir
+um por um. "Preencher Ano" (Legislação e Documentos Diversos) tenta
+descobrir o ano automaticamente a partir do número do documento (formato
+"123/2026"); quando não consegue, lista o registro pra preenchimento
+manual. Tudo em lote, nunca documento por documento em sequência.
+
+**v1.8** — Adicionado versionamento (`?v=`) nos arquivos JS/CSS
 carregados pelo `index.html`, para eliminar de vez os problemas de
 cache que fizeram parecer que correções de código não tinham funcionado
 (o navegador/Service Worker continuava rodando a versão antiga mesmo

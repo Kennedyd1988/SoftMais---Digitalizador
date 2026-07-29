@@ -289,6 +289,7 @@ const ITENS_MENU = [
   { chave: "tipos-documento", rotulo: "Tipos de Documento", icone: "⚙️", modulo: "config" },
   { chave: "usuarios", rotulo: "Usuários", icone: "👤", modulo: "usuarios", somenteAdmin: true },
   { chave: "unidades-gestoras", rotulo: "Unidades Gestoras", icone: "🏢", modulo: "unidadesGestoras", somenteAdmin: true },
+  { chave: "manutencao", rotulo: "Manutenção", icone: "🔧", modulo: "manutencao", somenteAdmin: true },
 ];
 
 let paginaAtual = "inicio";
@@ -371,6 +372,9 @@ function navegarPara(chave) {
       break;
     case "unidades-gestoras":
       renderizarUnidadesGestoras(area);
+      break;
+    case "manutencao":
+      renderizarManutencao(area);
       break;
     default:
       area.innerHTML = "<p>Página não encontrada.</p>";

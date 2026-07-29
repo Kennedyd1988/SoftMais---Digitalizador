@@ -354,7 +354,7 @@ async function renderizarCredores(area) {
 // ===================================================================
 // MODAL GENÉRICO (usado por todos os formulários do app)
 // ===================================================================
-function criarModal(titulo, corpoHtml, aoSalvar) {
+function criarModal(titulo, corpoHtml, aoSalvar, aoExcluir = null) {
   const fundo = document.createElement("div");
   fundo.className = "fundo-modal";
   fundo.id = "fundo-modal-ativo";
@@ -366,8 +366,11 @@ function criarModal(titulo, corpoHtml, aoSalvar) {
       </div>
       <div class="corpo-modal">${corpoHtml}</div>
       <div class="rodape-modal">
-        <button class="botao-secundario" id="btn-cancelar-modal">Cancelar</button>
-        <button class="botao-primario" id="btn-salvar-modal">Salvar</button>
+        ${aoExcluir ? `<button class="botao-perigo" id="btn-excluir-modal">🗑️ Excluir</button>` : ""}
+        <div class="rodape-modal-direita">
+          <button class="botao-secundario" id="btn-cancelar-modal">Cancelar</button>
+          <button class="botao-primario" id="btn-salvar-modal">Salvar</button>
+        </div>
       </div>
     </div>
   `;
@@ -377,6 +380,11 @@ function criarModal(titulo, corpoHtml, aoSalvar) {
   document.getElementById("btn-salvar-modal").addEventListener("click", (evento) =>
     aoSalvar(evento.target)
   );
+  if (aoExcluir) {
+    document.getElementById("btn-excluir-modal").addEventListener("click", (evento) =>
+      aoExcluir(evento.target)
+    );
+  }
   return fundo;
 }
 

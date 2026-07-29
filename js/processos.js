@@ -148,7 +148,7 @@ async function renderizarLicitacoes(area) {
         paginador.reiniciar();
         carregarPagina(true);
       });
-    });
+    }, registro ? (botao) => excluirLicitacao(registro, botao) : null);
 
     const controleAnexos = renderizarSecaoAnexos(
       modal.querySelector("#secao-anexos"),
@@ -156,6 +156,29 @@ async function renderizarLicitacoes(area) {
       "licitacoes",
       () => {}
     );
+  }
+
+  async function excluirLicitacao(registro, botaoExcluir) {
+    const referenciado = await existeReferenciaPara("licitacoes", registro.id);
+    if (referenciado) {
+      mostrarToast(
+        `Não é possível excluir: esta licitação está vinculada a registros em ${referenciado}.`,
+        "erro"
+      );
+      return;
+    }
+    if (!confirm(`Excluir a licitação "${registro.numero}/${registro.ano}"? Os anexos também serão removidos do Drive.`)) return;
+
+    await executarComFeedback(botaoExcluir, async () => {
+      for (const anexo of registro.anexos || []) {
+        try { await excluirAnexoDrive(anexo.driveFileId); } catch (e) { console.warn("Falha ao remover anexo do Drive:", e); }
+      }
+      await colecaoEntidade("licitacoes").doc(registro.id).delete();
+      fecharModal();
+      mostrarToast("Licitação excluída com sucesso.", "sucesso");
+      paginador.reiniciar();
+      carregarPagina(true);
+    }, "Excluindo...");
   }
 
   document.getElementById("btn-novo")?.addEventListener("click", () => abrirFormulario());
@@ -286,7 +309,7 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
         paginador.reiniciar();
         carregarPagina(true);
       });
-    });
+    }, registro ? (botao) => excluirRegistroModulo(registro, botao) : null);
 
     const controleAnexos = renderizarSecaoAnexos(
       modal.querySelector("#secao-anexos"),
@@ -294,6 +317,20 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
       nomeColecao,
       () => {}
     );
+  }
+
+  async function excluirRegistroModulo(registro, botaoExcluir) {
+    if (!confirm(`Excluir este registro (${mapaTipos[registro.tipoId] || ""} nº ${registro.numero})? Os anexos também serão removidos do Drive.`)) return;
+    await executarComFeedback(botaoExcluir, async () => {
+      for (const anexo of registro.anexos || []) {
+        try { await excluirAnexoDrive(anexo.driveFileId); } catch (e) { console.warn("Falha ao remover anexo do Drive:", e); }
+      }
+      await colecaoEntidade(nomeColecao).doc(registro.id).delete();
+      fecharModal();
+      mostrarToast(`${tituloSingular} excluído com sucesso.`, "sucesso");
+      paginador.reiniciar();
+      carregarPagina(true);
+    }, "Excluindo...");
   }
 
   document.getElementById("btn-novo")?.addEventListener("click", () => abrirFormulario());
@@ -557,7 +594,7 @@ async function renderizarDespesas(area) {
         paginador.reiniciar();
         carregarPagina(true);
       });
-    });
+    }, registro ? (botao) => excluirDespesa(registro, botao) : null);
 
     const controleAnexos = renderizarSecaoAnexos(
       modal.querySelector("#secao-anexos"),
@@ -580,6 +617,20 @@ async function renderizarDespesas(area) {
       buscar: (termo) => buscarLicitacoesPorTermo(termo),
       rotulo: (item) => `${item.numero}/${item.ano} — ${item.objeto}`.slice(0, 80),
     });
+  }
+
+  async function excluirDespesa(registro, botaoExcluir) {
+    if (!confirm(`Excluir o processo de despesa "Empenho ${registro.numeroEmpenho}"? Os anexos também serão removidos do Drive.`)) return;
+    await executarComFeedback(botaoExcluir, async () => {
+      for (const anexo of registro.anexos || []) {
+        try { await excluirAnexoDrive(anexo.driveFileId); } catch (e) { console.warn("Falha ao remover anexo do Drive:", e); }
+      }
+      await colecaoEntidade("processosDespesa").doc(registro.id).delete();
+      fecharModal();
+      mostrarToast("Processo de despesa excluído com sucesso.", "sucesso");
+      paginador.reiniciar();
+      carregarPagina(true);
+    }, "Excluindo...");
   }
 
   document.getElementById("btn-novo")?.addEventListener("click", () => abrirFormulario());

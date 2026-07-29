@@ -148,7 +148,9 @@ input:focus, select:focus, textarea:focus {
 }
 .lista-erros-importacao div { padding: 2px 0; }
 
-.barra-busca { margin-bottom: 16px; max-width: 420px; }
+.barra-busca { margin-bottom: 16px; display: flex; gap: 10px; flex-wrap: wrap; max-width: 620px; }
+.barra-busca input[type="text"] { flex: 1; min-width: 200px; }
+.filtro-ano { max-width: 160px; }
 
 .cartao-boas-vindas {
   background: var(--branco);
@@ -240,6 +242,18 @@ input:focus, select:focus, textarea:focus {
 .toast-sucesso { background: var(--verde-sucesso); }
 .toast-erro { background: var(--vermelho-erro); }
 .mensagem-erro { color: var(--vermelho-erro); margin-top: 12px; font-size: 14px; }
+
+/* ---------- RELATÓRIOS ---------- */
+.grade-resumo { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 16px 0 24px; }
+.cartao-resumo { background: var(--branco); border: 1px solid var(--cinza-borda); border-radius: var(--raio, 10px); padding: 16px; }
+.numero-resumo { font-size: 22px; font-weight: 600; color: var(--azul-principal); }
+.rotulo-resumo { font-size: 13px; color: var(--cinza-texto); margin-top: 4px; }
+.tabela-relatorio { width: 100%; border-collapse: collapse; margin-bottom: 24px; background: var(--branco); border: 1px solid var(--cinza-borda); border-radius: var(--raio, 10px); overflow: hidden; }
+.tabela-relatorio th, .tabela-relatorio td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--cinza-borda); font-size: 13px; }
+.tabela-relatorio th:nth-child(2), .tabela-relatorio th:nth-child(3),
+.tabela-relatorio td:nth-child(2), .tabela-relatorio td:nth-child(3) { text-align: right; }
+.tabela-relatorio th { background: var(--ink); color: var(--cinza-texto); font-weight: 600; }
+.tabela-relatorio tr:last-child td { border-bottom: none; }
 
 /* ---------- RESPONSIVO ---------- */
 @media (max-width: 820px) {

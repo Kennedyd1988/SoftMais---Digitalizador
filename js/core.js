@@ -265,6 +265,7 @@ const ITENS_MENU = [
   { chave: "despesas", rotulo: "Processos de Despesa", icone: "💰", modulo: "despesas" },
   { chave: "legislacao", rotulo: "Legislação", icone: "⚖️", modulo: "legislacao" },
   { chave: "documentos-diversos", rotulo: "Documentos Diversos", icone: "📂", modulo: "documentosDiversos" },
+  { chave: "relatorios", rotulo: "Relatórios", icone: "📊", modulo: "relatorios" },
   { chave: "modalidades-licitacao", rotulo: "Modalidades de Licitação", icone: "⚙️", modulo: "config" },
   { chave: "unidades-orcamentarias", rotulo: "Unidades Orçamentárias", icone: "⚙️", modulo: "config" },
   { chave: "fontes-recurso", rotulo: "Fontes de Recurso", icone: "⚙️", modulo: "config" },
@@ -328,6 +329,9 @@ function navegarPara(chave) {
       break;
     case "documentos-diversos":
       renderizarDocumentosDiversos(area);
+      break;
+    case "relatorios":
+      renderizarRelatorios(area);
       break;
     case "modalidades-licitacao":
       renderizarCadastroSimples(area, "modalidadesLicitacao", "Modalidade de Licitação");

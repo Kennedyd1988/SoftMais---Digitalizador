@@ -121,6 +121,34 @@ Documentos Diversos, seguindo o padrão do projeto:
 
 ## Changelog
 
+**v1.5** — Filtro por ano em Licitações, Despesas, Legislação e
+Documentos Diversos (Legislação e Documentos Diversos ganharam campo
+"Ano" novo, que não existia antes). Nova aba **Relatórios**: totais e
+contagens por ano — total em R$ e quantidade de despesas, com
+detalhamento por Unidade Orçamentária e por Fonte de Recurso, mais
+contagem de Licitações, Legislação e Documentos Diversos do ano. Todos
+os totais calculados no servidor via agregação do Firestore (`count()` e
+`aggregate(sum)`), nunca baixando os processos inteiros para somar no
+cliente. O relatório pode ser exportado em PDF (jsPDF), com cabeçalho,
+tabelas e rodapé com numeração de página, reaproveitáveis para relatórios
+futuros. **Atenção:** despesas cadastradas antes da v1.3 não têm Unidade
+Orçamentária/Fonte de Recurso com o novo campo Código, e licitações,
+legislação e documentos cadastrados antes dessa versão podem não entrar
+na contagem por ano do relatório se não tiverem o campo `ano` preenchido
+(Legislação e Documentos Diversos antigos precisam ser abertos e salvos
+de novo para ganhar esse campo).
+
+**v1.4** — Corrigida a busca de Processos de Despesa: antes só filtrava
+pelo campo Objeto (apesar do texto do campo prometer buscar também por
+número do empenho); agora consulta em paralelo três campos — número do
+empenho, credor e objeto — e junta os resultados. Como o Firestore só
+permite busca por prefixo em um campo por consulta, a solução usa 3
+consultas simultâneas em vez de uma só. **Atenção:** despesas cadastradas
+antes dessa versão não têm os campos `numeroEmpenhoNormalizado` e
+`credorNomeNormalizado` gravados, então não aparecerão em buscas por
+número do empenho ou credor até serem abertas e salvas de novo (mesmo
+sem alterar nada, o simples "Salvar" já preenche os campos que faltam).
+
 **v1.3** — Novos campos: Processo de Despesa ganhou "Ordem de Pagamento"
 e "Elemento de Despesa" (validado no formato 9.9.99.99.99); Unidade
 Orçamentária e Fonte de Recurso ganharam campo "Código", exibido também

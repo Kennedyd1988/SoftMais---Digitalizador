@@ -2,6 +2,16 @@
 // MÓDULOS DE PROCESSOS
 // ===================================================================
 
+/** Gera as opções de um <select> de anos, do mais recente pro mais antigo */
+function gerarOpcoesAno(anoSelecionado) {
+  const anoAtual = new Date().getFullYear();
+  let html = `<option value="">Todos os anos</option>`;
+  for (let ano = anoAtual + 1; ano >= anoAtual - 15; ano--) {
+    html += `<option value="${ano}" ${String(ano) === String(anoSelecionado) ? "selected" : ""}>${ano}</option>`;
+  }
+  return html;
+}
+
 /** Carrega uma lista pequena de cadastro (modalidade, unidade orç., etc.) para popular um <select> */
 async function carregarOpcoesSelect(nomeColecao) {
   const snapshot = await colecaoEntidade(nomeColecao).orderBy("nomeNormalizado").limit(500).get();
@@ -26,12 +36,13 @@ async function renderizarLicitacoes(area) {
     </div>
     <div class="barra-busca">
       <input type="text" id="campo-busca" placeholder="Buscar por número, ano ou objeto...">
+      <select id="filtro-ano" class="filtro-ano">${gerarOpcoesAno()}</select>
     </div>
     <div id="lista-registros" class="lista-cartoes"></div>
     <button id="btn-carregar-mais" class="botao-secundario oculto">Carregar mais</button>
   `;
 
-  const paginador = criarPaginador(colecaoEntidade("licitacoes").orderBy("criadoEm", "desc"));
+  let paginador = criarPaginador(colecaoEntidade("licitacoes").orderBy("criadoEm", "desc"));
   const modalidades = await carregarOpcoesSelect("modalidadesLicitacao");
   const mapaModalidades = Object.fromEntries(modalidades.map((m) => [m.id, m.nome]));
   const mapaModalidadePorNome = Object.fromEntries(modalidades.map((m) => [normalizarTexto(m.nome), m.id]));
@@ -200,6 +211,16 @@ async function renderizarLicitacoes(area) {
   document.getElementById("btn-carregar-mais").addEventListener("click", () => carregarPagina(false));
   configurarBuscaGenerica("licitacoes", criarCartao, paginador, carregarPagina);
 
+  document.getElementById("filtro-ano").addEventListener("change", (evento) => {
+    document.getElementById("campo-busca").value = "";
+    const ano = evento.target.value;
+    const consulta = ano
+      ? colecaoEntidade("licitacoes").where("ano", "==", parseInt(ano, 10)).orderBy("criadoEm", "desc")
+      : colecaoEntidade("licitacoes").orderBy("criadoEm", "desc");
+    paginador = criarPaginador(consulta);
+    carregarPagina(true);
+  });
+
   carregarPagina(true);
 }
 
@@ -215,12 +236,13 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
     </div>
     <div class="barra-busca">
       <input type="text" id="campo-busca" placeholder="Buscar por número ou objeto...">
+      <select id="filtro-ano" class="filtro-ano">${gerarOpcoesAno()}</select>
     </div>
     <div id="lista-registros" class="lista-cartoes"></div>
     <button id="btn-carregar-mais" class="botao-secundario oculto">Carregar mais</button>
   `;
 
-  const paginador = criarPaginador(colecaoEntidade(nomeColecao).orderBy("criadoEm", "desc"));
+  let paginador = criarPaginador(colecaoEntidade(nomeColecao).orderBy("criadoEm", "desc"));
   const tipos = await carregarOpcoesSelect("tiposDocumento");
   const mapaTipos = Object.fromEntries(tipos.map((t) => [t.id, t.nome]));
   const mapaTipoPorNome = Object.fromEntries(tipos.map((t) => [normalizarTexto(t.nome), t.id]));
@@ -229,6 +251,7 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
     const colunasModulo = [
       { chave: "tipo", rotulo: "Tipo", obrigatorio: true, exemplo: tipos[0]?.nome || "Portaria", ajuda: "Precisa ser igual ao nome já cadastrado em Tipos de Documento." },
       { chave: "numero", rotulo: "Número", obrigatorio: true, exemplo: "032/2026" },
+      { chave: "ano", rotulo: "Ano", obrigatorio: true, exemplo: new Date().getFullYear() },
       { chave: "objeto", rotulo: "Objeto", obrigatorio: true, exemplo: "Nomeação de servidor" },
     ];
     adicionarBotoesImportExport(document.getElementById("acoes-cabecalho"), {
@@ -238,13 +261,15 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
       montarDocumento: async (linha) => {
         const nomeTipo = (linha["Tipo"] || "").toString().trim();
         const numero = (linha["Número"] || "").toString().trim();
+        const ano = parseInt(linha["Ano"], 10);
         const objeto = (linha["Objeto"] || "").toString().trim();
         const tipoId = mapaTipoPorNome[normalizarTexto(nomeTipo)];
         if (!tipoId) throw new Error(`Tipo "${nomeTipo}" não encontrado. Cadastre-o antes de importar.`);
         if (!numero) throw new Error("Número é obrigatório.");
+        if (!ano) throw new Error("Ano é obrigatório.");
         if (!objeto) throw new Error("Objeto é obrigatório.");
         return {
-          tipoId, numero, objeto,
+          tipoId, numero, ano, objeto,
           objetoNormalizado: normalizarTexto(objeto),
           anexos: [],
           criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
@@ -253,6 +278,7 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
       montarLinhaExportacao: async (registro) => ({
         "Tipo": mapaTipos[registro.tipoId] || "",
         "Número": registro.numero || "",
+        "Ano": registro.ano || "",
         "Objeto": registro.objeto || "",
       }),
       aoImportarComSucesso: () => { paginador.reiniciar(); carregarPagina(true); },
@@ -272,7 +298,7 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
     cartao.className = "cartao-registro";
     cartao.innerHTML = `
       <div>
-        <strong>${mapaTipos[registro.tipoId] || "Tipo não informado"} nº ${registro.numero}</strong>
+        <strong>${mapaTipos[registro.tipoId] || "Tipo não informado"} nº ${registro.numero}${registro.ano ? "/" + registro.ano : ""}</strong>
         <div class="texto-secundario">${registro.objeto}</div>
         <div class="texto-secundario">${(registro.anexos || []).length} anexo(s)</div>
       </div>
@@ -305,18 +331,22 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
       </select>
       <label>Número *</label>
       <input type="text" id="campo-numero" value="${registro?.numero || ""}">
+      <label>Ano *</label>
+      <input type="number" id="campo-ano" value="${registro?.ano || new Date().getFullYear()}">
       <label>Objeto *</label>
       <textarea id="campo-objeto" rows="3">${registro?.objeto || ""}</textarea>
       <div id="secao-anexos"></div>
     `, async (botaoSalvar) => {
       const campoTipo = document.getElementById("campo-tipo");
       const campoNumero = document.getElementById("campo-numero");
+      const campoAno = document.getElementById("campo-ano");
       const campoObjeto = document.getElementById("campo-objeto");
-      [campoTipo, campoNumero, campoObjeto].forEach(limparCampoInvalido);
+      [campoTipo, campoNumero, campoAno, campoObjeto].forEach(limparCampoInvalido);
 
       let valido = true;
       if (!campoTipo.value) { marcarCampoInvalido(campoTipo, "Selecione o tipo."); valido = false; }
       if (!campoNumero.value.trim()) { marcarCampoInvalido(campoNumero, "Informe o número."); valido = false; }
+      if (!campoAno.value) { marcarCampoInvalido(campoAno, "Informe o ano."); valido = false; }
       if (!campoObjeto.value.trim()) { marcarCampoInvalido(campoObjeto, "Informe o objeto."); valido = false; }
       if (!valido) return;
 
@@ -324,6 +354,7 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
         const dados = {
           tipoId: campoTipo.value,
           numero: campoNumero.value.trim(),
+          ano: parseInt(campoAno.value, 10),
           objeto: campoObjeto.value.trim(),
           objetoNormalizado: normalizarTexto(campoObjeto.value),
           anexos: controleAnexos.obterAnexos(),
@@ -367,6 +398,16 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
   document.getElementById("btn-carregar-mais").addEventListener("click", () => carregarPagina(false));
   configurarBuscaGenerica(nomeColecao, criarCartao, paginador, carregarPagina, "objetoNormalizado");
 
+  document.getElementById("filtro-ano").addEventListener("change", (evento) => {
+    document.getElementById("campo-busca").value = "";
+    const ano = evento.target.value;
+    const consulta = ano
+      ? colecaoEntidade(nomeColecao).where("ano", "==", parseInt(ano, 10)).orderBy("criadoEm", "desc")
+      : colecaoEntidade(nomeColecao).orderBy("criadoEm", "desc");
+    paginador = criarPaginador(consulta);
+    carregarPagina(true);
+  });
+
   carregarPagina(true);
 }
 
@@ -388,13 +429,14 @@ async function renderizarDespesas(area) {
       ${usuarioPodeEditar() ? `<button class="botao-primario" id="btn-novo">+ Novo Processo</button>` : ""}
     </div>
     <div class="barra-busca">
-      <input type="text" id="campo-busca" placeholder="Buscar por número do empenho ou objeto...">
+      <input type="text" id="campo-busca" placeholder="Buscar por número do empenho, credor ou objeto...">
+      <select id="filtro-ano" class="filtro-ano">${gerarOpcoesAno()}</select>
     </div>
     <div id="lista-registros" class="lista-cartoes"></div>
     <button id="btn-carregar-mais" class="botao-secundario oculto">Carregar mais</button>
   `;
 
-  const paginador = criarPaginador(colecaoEntidade("processosDespesa").orderBy("criadoEm", "desc"));
+  let paginador = criarPaginador(colecaoEntidade("processosDespesa").orderBy("criadoEm", "desc"));
   const [unidadesOrc, fontesRecurso] = await Promise.all([
     carregarOpcoesSelect("unidadesOrcamentarias"),
     carregarOpcoesSelect("fontesRecurso"),
@@ -487,10 +529,12 @@ async function renderizarDespesas(area) {
 
         return {
           numeroEmpenho,
+          numeroEmpenhoNormalizado: normalizarTexto(numeroEmpenho),
           ordemPagamento,
           elementoDespesa,
           credorId: credor.id,
           credorNome: credor.nome,
+          credorNomeNormalizado: normalizarTexto(credor.nome),
           unidadeOrcamentariaId,
           fonteRecursoId,
           licitacaoId,
@@ -653,10 +697,12 @@ async function renderizarDespesas(area) {
       await executarComFeedback(botaoSalvar, async () => {
         const dados = {
           numeroEmpenho: campoNumeroEmpenho.value.trim(),
+          numeroEmpenhoNormalizado: normalizarTexto(campoNumeroEmpenho.value),
           ordemPagamento: campoOrdemPagamento.value.trim(),
           elementoDespesa: campoElementoDespesa.value.trim(),
           credorId: campoCredorId.value,
           credorNome: document.getElementById("campo-credor-busca").value.trim(),
+          credorNomeNormalizado: normalizarTexto(document.getElementById("campo-credor-busca").value),
           unidadeOrcamentariaId: campoUnidadeOrc.value,
           fonteRecursoId: campoFonteRecurso.value,
           licitacaoId: document.getElementById("campo-licitacao-id").value || null,
@@ -722,9 +768,73 @@ async function renderizarDespesas(area) {
 
   document.getElementById("btn-novo")?.addEventListener("click", () => abrirFormulario());
   document.getElementById("btn-carregar-mais").addEventListener("click", () => carregarPagina(false));
-  configurarBuscaGenerica("processosDespesa", criarCartao, paginador, carregarPagina, "objetoNormalizado");
+  configurarBuscaMultiCampoDespesas(paginador, carregarPagina, criarCartao);
+
+  document.getElementById("filtro-ano").addEventListener("change", (evento) => {
+    document.getElementById("campo-busca").value = "";
+    const ano = evento.target.value;
+    const consulta = ano
+      ? colecaoEntidade("processosDespesa")
+          .orderBy("competenciaKey")
+          .startAt(`${ano}-01`)
+          .endAt(`${ano}-12`)
+      : colecaoEntidade("processosDespesa").orderBy("criadoEm", "desc");
+    paginador = criarPaginador(consulta);
+    carregarPagina(true);
+  });
 
   carregarPagina(true);
+}
+
+/**
+ * Busca dedicada da Despesa: consulta em paralelo por prefixo em três
+ * campos diferentes (número do empenho, credor e objeto) e junta os
+ * resultados sem duplicar. O Firestore só permite consulta por prefixo
+ * num campo por vez, por isso a necessidade de 3 consultas separadas em
+ * vez de uma única "busca em tudo".
+ */
+function configurarBuscaMultiCampoDespesas(paginador, carregarPagina, criarCartao) {
+  let temporizador;
+  document.getElementById("campo-busca").addEventListener("input", (evento) => {
+    clearTimeout(temporizador);
+    temporizador = setTimeout(async () => {
+      const termo = normalizarTexto(evento.target.value);
+      const lista = document.getElementById("lista-registros");
+      lista.innerHTML = "";
+      if (!termo) {
+        paginador.reiniciar();
+        carregarPagina(true);
+        return;
+      }
+
+      const campos = ["numeroEmpenhoNormalizado", "credorNomeNormalizado", "objetoNormalizado"];
+      const resultadosPorConsulta = await Promise.all(
+        campos.map((campo) =>
+          colecaoEntidade("processosDespesa")
+            .orderBy(campo)
+            .startAt(termo)
+            .endAt(termo + "\uf8ff")
+            .limit(TAMANHO_PAGINA)
+            .get()
+        )
+      );
+
+      const encontrados = new Map();
+      resultadosPorConsulta.forEach((snapshot) => {
+        snapshot.docs.forEach((doc) => {
+          if (!encontrados.has(doc.id)) {
+            encontrados.set(doc.id, { id: doc.id, ...doc.data() });
+          }
+        });
+      });
+
+      encontrados.forEach((registro) => lista.appendChild(criarCartao(registro)));
+      if (encontrados.size === 0) {
+        lista.innerHTML = `<p class="texto-secundario">Nenhum resultado encontrado.</p>`;
+      }
+      document.getElementById("btn-carregar-mais").classList.add("oculto");
+    }, 300);
+  });
 }
 
 async function buscarRegistrosPorNome(nomeColecao, termo) {

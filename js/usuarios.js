@@ -7,6 +7,7 @@ const ABAS_PERMISSIVEIS = [
   { chave: "despesas", rotulo: "Processos de Despesa" },
   { chave: "legislacao", rotulo: "Legislação" },
   { chave: "documentosDiversos", rotulo: "Documentos Diversos" },
+  { chave: "relatorios", rotulo: "Relatórios" },
 ];
 
 async function renderizarUsuarios(area) {

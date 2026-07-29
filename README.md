@@ -73,6 +73,16 @@ Pages como hospedagem, PWA instalável.
   usada só na criação de novos usuários, pra não deslogar o administrador
   que está cadastrando.
 
+- **Versionamento de arquivos (`?v=2` no fim dos links de JS/CSS)**:
+  criado depois de descobrir que o Service Worker (e às vezes o próprio
+  cache do navegador) insistia em servir versões antigas dos arquivos
+  mesmo depois de atualizados no GitHub, mascarando correções como se
+  não tivessem funcionado. Sempre que um arquivo `.js` ou `.css` for
+  alterado, é preciso aumentar o número da versão (`?v=3`, `?v=4`...) no
+  `index.html`, na mesma linha do arquivo alterado — isso força o
+  navegador a tratar como um recurso novo, sem precisar pedir pro usuário
+  limpar cache manualmente toda vez.
+
 ## Limitações conhecidas
 
 - A regra "nunca deixar o sistema sem nenhum administrador" está
@@ -120,6 +130,13 @@ Documentos Diversos, seguindo o padrão do projeto:
   para relatório quanto para reimportar em outra unidade gestora.
 
 ## Changelog
+
+**v1.8** — Adicionado versionamento (`?v=2`) nos arquivos JS/CSS
+carregados pelo `index.html`, para eliminar de vez os problemas de
+cache que fizeram parecer que correções de código não tinham funcionado
+(o navegador/Service Worker continuava rodando a versão antiga mesmo
+depois do arquivo atualizado no GitHub). A partir de agora, toda entrega
+que alterar `.js`/`.css` já vem com esse número aumentado.
 
 **v1.7** — Corrigida lentidão no carregamento da lista de Processos de
 Despesa: a tela estava baixando a coleção inteira de Credores e de

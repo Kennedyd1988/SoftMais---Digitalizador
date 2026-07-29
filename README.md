@@ -121,6 +121,14 @@ Documentos Diversos, seguindo o padrão do projeto:
 
 ## Changelog
 
+**v1.6** — A busca de Processos de Despesa estava cobrindo só três dos
+quatro campos prometidos: número do empenho, credor e objeto — faltava
+**Ordem de Pagamento**. Corrigido, agora busca nos quatro. Mesma
+observação de antes: despesas cadastradas antes dessa correção só
+passam a aparecer na busca por Ordem de Pagamento depois de serem
+abertas e salvas de novo (ou reindexadas em massa, se um dia isso virar
+necessário para muitos registros).
+
 **v1.5** — Filtro por ano em Licitações, Despesas, Legislação e
 Documentos Diversos (Legislação e Documentos Diversos ganharam campo
 "Ano" novo, que não existia antes). Nova aba **Relatórios**: totais e

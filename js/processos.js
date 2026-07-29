@@ -445,7 +445,7 @@ async function renderizarDespesas(area) {
       ${usuarioPodeEditar() ? `<button class="botao-primario" id="btn-novo">+ Novo Processo</button>` : ""}
     </div>
     <div class="barra-busca">
-      <input type="text" id="campo-busca" placeholder="Buscar por número do empenho, credor ou objeto...">
+      <input type="text" id="campo-busca" placeholder="Buscar por empenho, ordem de pagamento, credor ou objeto...">
       <select id="filtro-ano" class="filtro-ano">${gerarOpcoesAno()}</select>
     </div>
     <div id="lista-registros" class="lista-cartoes"></div>
@@ -547,6 +547,7 @@ async function renderizarDespesas(area) {
           numeroEmpenho,
           numeroEmpenhoNormalizado: normalizarTexto(numeroEmpenho),
           ordemPagamento,
+          ordemPagamentoNormalizado: normalizarTexto(ordemPagamento),
           elementoDespesa,
           credorId: credor.id,
           credorNome: credor.nome,
@@ -723,6 +724,7 @@ async function renderizarDespesas(area) {
           numeroEmpenho: campoNumeroEmpenho.value.trim(),
           numeroEmpenhoNormalizado: normalizarTexto(campoNumeroEmpenho.value),
           ordemPagamento: campoOrdemPagamento.value.trim(),
+          ordemPagamentoNormalizado: normalizarTexto(campoOrdemPagamento.value),
           elementoDespesa: campoElementoDespesa.value.trim(),
           credorId: campoCredorId.value,
           credorNome: document.getElementById("campo-credor-busca").value.trim(),
@@ -831,7 +833,7 @@ function configurarBuscaMultiCampoDespesas(paginador, carregarPagina, criarCarta
         return;
       }
 
-      const campos = ["numeroEmpenhoNormalizado", "credorNomeNormalizado", "objetoNormalizado"];
+      const campos = ["numeroEmpenhoNormalizado", "ordemPagamentoNormalizado", "credorNomeNormalizado", "objetoNormalizado"];
       try {
         const resultadosPorConsulta = await Promise.all(
           campos.map((campo) =>

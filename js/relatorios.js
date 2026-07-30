@@ -51,10 +51,14 @@ function gerarOpcoesAnoObrigatorio() {
 }
 
 /**
- * Busca todos os números do relatório usando agregação no servidor.
- * Faz uma consulta por unidade orçamentária e uma por fonte de recurso
- * (bounded pela quantidade de cadastros de apoio, tipicamente pequena),
- * em vez de baixar todos os processos de despesa para somar no cliente.
+ * Busca os números do relatório. Calcula tudo a partir dos próprios
+ * documentos (bounded pelo ano escolhido), em vez de usar a API de
+ * agregação (count()/aggregate()) do Firestore — essa API tem relatos
+ * conhecidos de não funcionar de forma confiável no SDK "compat" (o
+ * mesmo formato usado neste app), então preferimos uma forma mais
+ * simples e garantida de funcionar: buscar os documentos do ano (uma
+ * ação explícita e limitada a um período, não um carregamento da lista
+ * inteira) e somar/contar no próprio navegador.
  */
 async function calcularDadosRelatorio(ano) {
   const inicioCompetencia = `${ano}-01`;
@@ -64,41 +68,24 @@ async function calcularDadosRelatorio(ano) {
     .where("competenciaKey", ">=", inicioCompetencia)
     .where("competenciaKey", "<=", fimCompetencia);
 
-  // Total geral de despesas do ano (contagem + soma), via agregação no
-  // servidor — essa consulta usa só um filtro de intervalo (competenciaKey),
-  // então não precisa de índice composto.
-  const [contagemDespesas, somaDespesas] = await Promise.all([
-    consultaDespesasDoAno.count().get(),
-    consultaDespesasDoAno.aggregate({ total: firebase.firestore.AggregateField.sum("valor") }).get(),
-  ]);
-
-  // Contagens simples por ano nos outros três módulos (filtro de
-  // igualdade único, também sem necessidade de índice composto)
-  const [contagemLicitacoes, contagemLegislacao, contagemDocumentos] = await Promise.all([
-    colecaoEntidade("licitacoes").where("ano", "==", parseInt(ano, 10)).count().get(),
-    colecaoEntidade("legislacao").where("ano", "==", parseInt(ano, 10)).count().get(),
-    colecaoEntidade("documentosDiversos").where("ano", "==", parseInt(ano, 10)).count().get(),
-  ]);
-
-  // Detalhamento por Unidade Orçamentária e por Fonte de Recurso.
-  //
-  // Importante: cruzar um filtro de intervalo (competenciaKey) com um
-  // filtro de igualdade (unidadeOrcamentariaId ou fonteRecursoId) exige
-  // um índice composto no Firestore — e criar um índice desses pra cada
-  // unidade orçamentária/fonte de recurso cadastrada não é viável. Por
-  // isso, em vez de uma consulta de agregação por item, buscamos os
-  // documentos do ano UMA única vez (a mesma consulta de intervalo já
-  // usada acima) e agrupamos/somamos no próprio navegador. Isso é uma
-  // busca deliberada e limitada a um ano (não é "carregar tudo"), do
-  // mesmo jeito que a exportação de planilha já faz uma busca completa
-  // quando é uma ação explícita do usuário.
-  const [unidadesOrc, fontesRecurso, snapshotDespesasDoAno] = await Promise.all([
+  const [
+    snapshotDespesasDoAno,
+    snapshotLicitacoes,
+    snapshotLegislacao,
+    snapshotDocumentos,
+    unidadesOrc,
+    fontesRecurso,
+  ] = await Promise.all([
+    consultaDespesasDoAno.get(),
+    colecaoEntidade("licitacoes").where("ano", "==", parseInt(ano, 10)).get(),
+    colecaoEntidade("legislacao").where("ano", "==", parseInt(ano, 10)).get(),
+    colecaoEntidade("documentosDiversos").where("ano", "==", parseInt(ano, 10)).get(),
     carregarOpcoesSelect("unidadesOrcamentarias"),
     carregarOpcoesSelect("fontesRecurso"),
-    consultaDespesasDoAno.get(),
   ]);
 
   const despesasDoAno = snapshotDespesasDoAno.docs.map((doc) => doc.data());
+  const totalDespesas = despesasDoAno.reduce((soma, despesa) => soma + (despesa.valor || 0), 0);
 
   function agruparESomar(campo, lista) {
     const mapaPorId = {};
@@ -125,14 +112,14 @@ async function calcularDadosRelatorio(ano) {
 
   return {
     despesas: {
-      quantidade: contagemDespesas.data().count || 0,
-      total: somaDespesas.data().total || 0,
+      quantidade: despesasDoAno.length,
+      total: totalDespesas,
       porUnidadeOrc,
       porFonteRecurso,
     },
-    licitacoes: contagemLicitacoes.data().count || 0,
-    legislacao: contagemLegislacao.data().count || 0,
-    documentosDiversos: contagemDocumentos.data().count || 0,
+    licitacoes: snapshotLicitacoes.size,
+    legislacao: snapshotLegislacao.size,
+    documentosDiversos: snapshotDocumentos.size,
   };
 }
 

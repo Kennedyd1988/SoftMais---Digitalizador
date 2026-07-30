@@ -225,7 +225,12 @@ async function renderizarLicitacoes(area) {
       () => {
         const numero = document.getElementById("campo-numero")?.value.trim();
         const ano = document.getElementById("campo-ano")?.value.trim();
-        return numero && ano ? `Licitacao-${numero}-${ano}` : "";
+        const campoModalidade = document.getElementById("campo-modalidade");
+        const modalidadeTexto = campoModalidade?.selectedOptions[0]?.text || "";
+        const temModalidade = modalidadeTexto && modalidadeTexto !== "Selecione...";
+        return numero && ano
+          ? `${temModalidade ? modalidadeTexto + "-" : ""}Licitacao-${numero}-${ano}`
+          : "";
       }
     );
   }

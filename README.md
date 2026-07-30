@@ -131,6 +131,16 @@ Documentos Diversos, seguindo o padrão do projeto:
 
 ## Changelog
 
+**v2.5** — **Correção real na aba Relatórios**: a API de agregação do
+Firestore (`AggregateField.sum`, `count()`) tem relatos conhecidos de
+não funcionar de forma confiável no SDK "compat" (o formato usado neste
+app), o que estava causando o erro genérico "Erro ao carregar a lista"
+sempre que o relatório era gerado. Trocado por um cálculo direto a
+partir dos documentos buscados (soma e contagem em JavaScript comum),
+sem depender dessa API — mais simples e garantido de funcionar. Também
+adicionada a modalidade no nome do PDF ao anexar em Licitações (Legislação
+e Documentos Diversos já incluíam o tipo).
+
 **v2.4** — Adicionada barra de progresso com percentual real durante o
 envio do PDF pro Google Drive. Foi preciso trocar o envio de `fetch`
 para `XMLHttpRequest`, porque o `fetch` não expõe nenhum evento de

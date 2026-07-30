@@ -25,10 +25,14 @@ async function renderizarRelatorios(area) {
     const ano = document.getElementById("filtro-ano-relatorio").value;
     const botao = document.getElementById("btn-gerar-relatorio");
     await executarComFeedback(botao, async () => {
-      const dados = await calcularDadosRelatorio(ano);
-      exibirRelatorioNaTela(dados, ano);
-      document.getElementById("btn-exportar-pdf").classList.remove("oculto");
-      document.getElementById("btn-exportar-pdf").onclick = () => gerarRelatorioPdf(dados, ano);
+      try {
+        const dados = await calcularDadosRelatorio(ano);
+        exibirRelatorioNaTela(dados, ano);
+        document.getElementById("btn-exportar-pdf").classList.remove("oculto");
+        document.getElementById("btn-exportar-pdf").onclick = () => gerarRelatorioPdf(dados, ano);
+      } catch (erro) {
+        tratarErroConsultaFirestore(erro);
+      }
     }, "Calculando...");
   });
 
@@ -60,55 +64,64 @@ async function calcularDadosRelatorio(ano) {
     .where("competenciaKey", ">=", inicioCompetencia)
     .where("competenciaKey", "<=", fimCompetencia);
 
-  // Total geral de despesas do ano (contagem + soma), via agregação
+  // Total geral de despesas do ano (contagem + soma), via agregação no
+  // servidor — essa consulta usa só um filtro de intervalo (competenciaKey),
+  // então não precisa de índice composto.
   const [contagemDespesas, somaDespesas] = await Promise.all([
     consultaDespesasDoAno.count().get(),
     consultaDespesasDoAno.aggregate({ total: firebase.firestore.AggregateField.sum("valor") }).get(),
   ]);
 
-  // Contagens simples por ano nos outros três módulos
+  // Contagens simples por ano nos outros três módulos (filtro de
+  // igualdade único, também sem necessidade de índice composto)
   const [contagemLicitacoes, contagemLegislacao, contagemDocumentos] = await Promise.all([
     colecaoEntidade("licitacoes").where("ano", "==", parseInt(ano, 10)).count().get(),
     colecaoEntidade("legislacao").where("ano", "==", parseInt(ano, 10)).count().get(),
     colecaoEntidade("documentosDiversos").where("ano", "==", parseInt(ano, 10)).count().get(),
   ]);
 
-  // Detalhamento por Unidade Orçamentária e por Fonte de Recurso
-  const [unidadesOrc, fontesRecurso] = await Promise.all([
+  // Detalhamento por Unidade Orçamentária e por Fonte de Recurso.
+  //
+  // Importante: cruzar um filtro de intervalo (competenciaKey) com um
+  // filtro de igualdade (unidadeOrcamentariaId ou fonteRecursoId) exige
+  // um índice composto no Firestore — e criar um índice desses pra cada
+  // unidade orçamentária/fonte de recurso cadastrada não é viável. Por
+  // isso, em vez de uma consulta de agregação por item, buscamos os
+  // documentos do ano UMA única vez (a mesma consulta de intervalo já
+  // usada acima) e agrupamos/somamos no próprio navegador. Isso é uma
+  // busca deliberada e limitada a um ano (não é "carregar tudo"), do
+  // mesmo jeito que a exportação de planilha já faz uma busca completa
+  // quando é uma ação explícita do usuário.
+  const [unidadesOrc, fontesRecurso, snapshotDespesasDoAno] = await Promise.all([
     carregarOpcoesSelect("unidadesOrcamentarias"),
     carregarOpcoesSelect("fontesRecurso"),
+    consultaDespesasDoAno.get(),
   ]);
 
-  async function somarPorReferencia(campo, lista) {
-    const resultados = [];
-    for (const item of lista) {
-      const consulta = consultaDespesasDoAno.where(campo, "==", item.id);
-      let soma = 0;
-      let quantidade = 0;
-      try {
-        const [snapshotSoma, snapshotContagem] = await Promise.all([
-          consulta.aggregate({ total: firebase.firestore.AggregateField.sum("valor") }).get(),
-          consulta.count().get(),
-        ]);
-        soma = snapshotSoma.data().total || 0;
-        quantidade = snapshotContagem.data().count || 0;
-      } catch (erro) {
-        // Se o Firestore pedir um índice composto na primeira vez, não
-        // travamos o relatório inteiro — só deixamos essa linha zerada
-        // e avisamos no console (o índice pode ser criado depois, ver README).
-        console.warn(`Não foi possível agregar ${campo}=${item.id}:`, erro);
-      }
-      if (quantidade > 0) {
-        resultados.push({ nome: item.codigo ? `${item.codigo} — ${item.nome}` : item.nome, soma, quantidade });
-      }
-    }
-    return resultados.sort((a, b) => b.soma - a.soma);
+  const despesasDoAno = snapshotDespesasDoAno.docs.map((doc) => doc.data());
+
+  function agruparESomar(campo, lista) {
+    const mapaPorId = {};
+    despesasDoAno.forEach((despesa) => {
+      const id = despesa[campo];
+      if (!id) return;
+      if (!mapaPorId[id]) mapaPorId[id] = { soma: 0, quantidade: 0 };
+      mapaPorId[id].soma += despesa.valor || 0;
+      mapaPorId[id].quantidade += 1;
+    });
+
+    return lista
+      .filter((item) => mapaPorId[item.id])
+      .map((item) => ({
+        nome: item.codigo ? `${item.codigo} — ${item.nome}` : item.nome,
+        soma: mapaPorId[item.id].soma,
+        quantidade: mapaPorId[item.id].quantidade,
+      }))
+      .sort((a, b) => b.soma - a.soma);
   }
 
-  const [porUnidadeOrc, porFonteRecurso] = await Promise.all([
-    somarPorReferencia("unidadeOrcamentariaId", unidadesOrc),
-    somarPorReferencia("fonteRecursoId", fontesRecurso),
-  ]);
+  const porUnidadeOrc = agruparESomar("unidadeOrcamentariaId", unidadesOrc);
+  const porFonteRecurso = agruparESomar("fonteRecursoId", fontesRecurso);
 
   return {
     despesas: {

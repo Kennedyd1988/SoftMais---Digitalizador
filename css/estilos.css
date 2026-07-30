@@ -148,9 +148,10 @@ input:focus, select:focus, textarea:focus {
 }
 .lista-erros-importacao div { padding: 2px 0; }
 
-.barra-busca { margin-bottom: 16px; display: flex; gap: 10px; flex-wrap: wrap; max-width: 620px; }
+.barra-busca { margin-bottom: 16px; display: flex; gap: 10px; flex-wrap: wrap; max-width: 760px; }
 .barra-busca input[type="text"] { flex: 1; min-width: 200px; }
 .filtro-ano { max-width: 160px; }
+.botao-filtro-ativo { background: var(--azul-principal); color: var(--branco); }
 
 .cartao-boas-vindas {
   background: var(--branco);

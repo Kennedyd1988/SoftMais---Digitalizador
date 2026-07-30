@@ -131,6 +131,25 @@ Documentos Diversos, seguindo o padrão do projeto:
 
 ## Changelog
 
+**v2.3** — **Correção importante nos Relatórios**: o detalhamento
+"Despesas por Unidade Orçamentária" e "por Fonte de Recurso" combinava
+um filtro de intervalo (competência do ano) com um filtro de igualdade
+(a unidade/fonte específica) — essa combinação exige um índice composto
+no Firestore, que não existia, e o erro estava sendo engolido
+silenciosamente, fazendo essas duas tabelas aparecerem sempre vazias
+mesmo havendo despesas no período. Corrigido: agora os documentos do ano
+são buscados uma única vez (mesma consulta simples já usada pro total) e
+agrupados/somados no navegador, sem depender de índice composto nenhum.
+
+Também adicionado o filtro **"📋 Sem anexo"** em Licitações, Despesas,
+Legislação e Documentos Diversos — mostra só os registros que ainda não
+têm nenhum PDF anexado, útil pra achar o que falta digitalizar. Precisou
+de um campo novo (`quantidadeAnexos`) gravado em cada registro; por isso
+a tela de Manutenção ganhou reindexadores para Licitações e para
+Legislação/Documentos Diversos (que já preenchem esse campo junto com o
+que já faziam), e o reindexador de Despesas também passou a corrigir
+esse campo.
+
 **v2.2** — Removido o botão "📷 Digitalizar" (captura por câmera) por
 decisão do cliente. A renomeação automática do PDF com base nos dados
 do cadastro (v2.1) continua funcionando normalmente pro botão "+

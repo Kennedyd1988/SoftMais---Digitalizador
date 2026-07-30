@@ -12,6 +12,36 @@ function gerarOpcoesAno(anoSelecionado) {
   return html;
 }
 
+/**
+ * Liga o botão "Sem anexo" a uma consulta que filtra só os registros com
+ * quantidadeAnexos == 0. Reaproveitado pelos 4 módulos com anexo.
+ */
+function configurarFiltroSemAnexo(nomeColecao, definirPaginador, carregarPagina) {
+  const botao = document.getElementById("btn-filtro-sem-anexo");
+  let ativo = false;
+
+  botao.addEventListener("click", () => {
+    ativo = !ativo;
+    botao.classList.toggle("botao-filtro-ativo", ativo);
+    document.getElementById("campo-busca").value = "";
+    const seletorAno = document.getElementById("filtro-ano");
+    if (seletorAno) seletorAno.value = "";
+
+    const consulta = ativo
+      ? colecaoEntidade(nomeColecao).where("quantidadeAnexos", "==", 0).orderBy("criadoEm", "desc")
+      : colecaoEntidade(nomeColecao).orderBy("criadoEm", "desc");
+    definirPaginador(criarPaginador(consulta));
+    carregarPagina(true);
+  });
+
+  return {
+    desativar() {
+      ativo = false;
+      botao.classList.remove("botao-filtro-ativo");
+    },
+  };
+}
+
 /** Carrega uma lista pequena de cadastro (modalidade, unidade orç., etc.) para popular um <select> */
 async function carregarOpcoesSelect(nomeColecao) {
   const snapshot = await colecaoEntidade(nomeColecao).orderBy("nomeNormalizado").limit(500).get();
@@ -37,6 +67,7 @@ async function renderizarLicitacoes(area) {
     <div class="barra-busca">
       <input type="text" id="campo-busca" placeholder="Buscar por número, ano ou objeto...">
       <select id="filtro-ano" class="filtro-ano">${gerarOpcoesAno()}</select>
+      <button type="button" class="botao-secundario" id="btn-filtro-sem-anexo">📋 Sem anexo</button>
     </div>
     <div id="lista-registros" class="lista-cartoes"></div>
     <button id="btn-carregar-mais" class="botao-secundario oculto">Carregar mais</button>
@@ -72,6 +103,7 @@ async function renderizarLicitacoes(area) {
           numero, ano, modalidadeId, objeto,
           objetoNormalizado: normalizarTexto(objeto),
           anexos: [],
+          quantidadeAnexos: 0,
           criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
         };
       },
@@ -170,6 +202,7 @@ async function renderizarLicitacoes(area) {
           objeto: campoObjeto.value.trim(),
           objetoNormalizado: normalizarTexto(campoObjeto.value),
           anexos: controleAnexos.obterAnexos(),
+          quantidadeAnexos: controleAnexos.obterAnexos().length,
         };
         if (registro) {
           await colecaoEntidade("licitacoes").doc(registro.id).update(dados);
@@ -224,8 +257,15 @@ async function renderizarLicitacoes(area) {
   document.getElementById("btn-carregar-mais").addEventListener("click", () => carregarPagina(false));
   configurarBuscaGenerica("licitacoes", criarCartao, paginador, carregarPagina);
 
+  const filtroSemAnexo = configurarFiltroSemAnexo(
+    "licitacoes",
+    (novoPaginador) => { paginador = novoPaginador; },
+    carregarPagina
+  );
+
   document.getElementById("filtro-ano").addEventListener("change", (evento) => {
     document.getElementById("campo-busca").value = "";
+    filtroSemAnexo.desativar();
     const ano = evento.target.value;
     const consulta = ano
       ? colecaoEntidade("licitacoes").where("ano", "==", parseInt(ano, 10)).orderBy("criadoEm", "desc")
@@ -250,6 +290,7 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
     <div class="barra-busca">
       <input type="text" id="campo-busca" placeholder="Buscar por número ou objeto...">
       <select id="filtro-ano" class="filtro-ano">${gerarOpcoesAno()}</select>
+      <button type="button" class="botao-secundario" id="btn-filtro-sem-anexo">📋 Sem anexo</button>
     </div>
     <div id="lista-registros" class="lista-cartoes"></div>
     <button id="btn-carregar-mais" class="botao-secundario oculto">Carregar mais</button>
@@ -285,6 +326,7 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
           tipoId, numero, ano, objeto,
           objetoNormalizado: normalizarTexto(objeto),
           anexos: [],
+          quantidadeAnexos: 0,
           criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
         };
       },
@@ -379,6 +421,7 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
           objeto: campoObjeto.value.trim(),
           objetoNormalizado: normalizarTexto(campoObjeto.value),
           anexos: controleAnexos.obterAnexos(),
+          quantidadeAnexos: controleAnexos.obterAnexos().length,
         };
         if (registro) {
           await colecaoEntidade(nomeColecao).doc(registro.id).update(dados);
@@ -426,8 +469,15 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
   document.getElementById("btn-carregar-mais").addEventListener("click", () => carregarPagina(false));
   configurarBuscaGenerica(nomeColecao, criarCartao, paginador, carregarPagina, "objetoNormalizado");
 
+  const filtroSemAnexo = configurarFiltroSemAnexo(
+    nomeColecao,
+    (novoPaginador) => { paginador = novoPaginador; },
+    carregarPagina
+  );
+
   document.getElementById("filtro-ano").addEventListener("change", (evento) => {
     document.getElementById("campo-busca").value = "";
+    filtroSemAnexo.desativar();
     const ano = evento.target.value;
     const consulta = ano
       ? colecaoEntidade(nomeColecao).where("ano", "==", parseInt(ano, 10)).orderBy("criadoEm", "desc")
@@ -459,6 +509,7 @@ async function renderizarDespesas(area) {
     <div class="barra-busca">
       <input type="text" id="campo-busca" placeholder="Buscar por empenho, ordem de pagamento, credor ou objeto...">
       <select id="filtro-ano" class="filtro-ano">${gerarOpcoesAno()}</select>
+      <button type="button" class="botao-secundario" id="btn-filtro-sem-anexo">📋 Sem anexo</button>
     </div>
     <div id="lista-registros" class="lista-cartoes"></div>
     <button id="btn-carregar-mais" class="botao-secundario oculto">Carregar mais</button>
@@ -585,6 +636,7 @@ async function renderizarDespesas(area) {
           competenciaKey: dataPagamento.slice(0, 7),
           valor,
           anexos: [],
+          quantidadeAnexos: 0,
           criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
         };
       },
@@ -767,6 +819,7 @@ async function renderizarDespesas(area) {
           competenciaKey: campoDataPagamento.value.slice(0, 7),
           valor: parseFloat(campoValor.value),
           anexos: controleAnexos.obterAnexos(),
+          quantidadeAnexos: controleAnexos.obterAnexos().length,
         };
         if (registro) {
           await colecaoEntidade("processosDespesa").doc(registro.id).update(dados);
@@ -827,8 +880,15 @@ async function renderizarDespesas(area) {
   document.getElementById("btn-carregar-mais").addEventListener("click", () => carregarPagina(false));
   configurarBuscaMultiCampoDespesas(paginador, carregarPagina, criarCartao);
 
+  const filtroSemAnexo = configurarFiltroSemAnexo(
+    "processosDespesa",
+    (novoPaginador) => { paginador = novoPaginador; },
+    carregarPagina
+  );
+
   document.getElementById("filtro-ano").addEventListener("change", (evento) => {
     document.getElementById("campo-busca").value = "";
+    filtroSemAnexo.desativar();
     const ano = evento.target.value;
     const consulta = ano
       ? colecaoEntidade("processosDespesa")

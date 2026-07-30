@@ -21,27 +21,38 @@ async function renderizarManutencao(area) {
       <h3>Reindexar campos de busca — Processos de Despesa</h3>
       <p class="texto-secundario">
         Preenche os campos internos usados na busca (número do empenho,
-        ordem de pagamento, credor, objeto) em processos de despesa que
-        foram cadastrados antes desses campos existirem. Não altera
-        nenhum dado visível do registro, só os campos de apoio à busca.
+        ordem de pagamento, credor, objeto) e a contagem de anexos (usada
+        no filtro "Sem anexo") em processos de despesa cadastrados antes
+        desses recursos existirem. Não altera nenhum dado visível do
+        registro, só os campos de apoio à busca/filtro.
       </p>
       <button class="botao-primario" id="btn-reindexar-despesas">Reindexar Processos de Despesa</button>
       <div id="resultado-despesas" class="resultado-manutencao"></div>
     </div>
 
     <div class="cartao-manutencao">
-      <h3>Preencher Ano — Legislação e Documentos Diversos</h3>
+      <h3>Preencher contagem de anexos — Licitações</h3>
+      <p class="texto-secundario">
+        Preenche a contagem de anexos (usada no filtro "Sem anexo") em
+        licitações cadastradas antes desse filtro existir.
+      </p>
+      <button class="botao-primario" id="btn-reindexar-licitacoes">Reindexar Licitações</button>
+      <div id="resultado-licitacoes" class="resultado-manutencao"></div>
+    </div>
+
+    <div class="cartao-manutencao">
+      <h3>Preencher Ano e contagem de anexos — Legislação e Documentos Diversos</h3>
       <p class="texto-secundario">
         Esses dois módulos ganharam o campo "Ano" depois de já existirem
         registros cadastrados. Esta ferramenta tenta descobrir o ano
         automaticamente a partir do número (quando estiver no formato
-        "123/2026", por exemplo). Registros em que não for possível
-        identificar o ano automaticamente ficam listados para você
-        preencher manualmente.
+        "123/2026", por exemplo), e já aproveita pra preencher a contagem
+        de anexos também. Registros em que não for possível identificar o
+        ano automaticamente ficam listados para você preencher manualmente.
       </p>
-      <button class="botao-primario" id="btn-reindexar-legislacao">Preencher Ano — Legislação</button>
+      <button class="botao-primario" id="btn-reindexar-legislacao">Reindexar Legislação</button>
       <div id="resultado-legislacao" class="resultado-manutencao"></div>
-      <button class="botao-primario" id="btn-reindexar-documentos" style="margin-top:10px">Preencher Ano — Documentos Diversos</button>
+      <button class="botao-primario" id="btn-reindexar-documentos" style="margin-top:10px">Reindexar Documentos Diversos</button>
       <div id="resultado-documentos" class="resultado-manutencao"></div>
     </div>
   `;
@@ -54,6 +65,17 @@ async function renderizarManutencao(area) {
         <p>✅ ${resultado.totalRevisados} registro(s) revisado(s), ${resultado.totalAtualizados} atualizado(s).</p>
       `;
       mostrarToast("Reindexação de despesas concluída.", "sucesso");
+    }, "Reindexando...");
+  });
+
+  document.getElementById("btn-reindexar-licitacoes").addEventListener("click", async (evento) => {
+    if (!confirm("Isso vai revisar todas as licitações da unidade gestora atual. Continuar?")) return;
+    await executarComFeedback(evento.target, async () => {
+      const resultado = await reindexarQuantidadeAnexos("licitacoes");
+      document.getElementById("resultado-licitacoes").innerHTML = `
+        <p>✅ ${resultado.totalRevisados} registro(s) revisado(s), ${resultado.totalAtualizados} atualizado(s).</p>
+      `;
+      mostrarToast("Reindexação de licitações concluída.", "sucesso");
     }, "Reindexando...");
   });
 
@@ -130,6 +152,11 @@ async function reindexarDespesas() {
       }
     }
 
+    const quantidadeAnexosEsperada = (dados.anexos || []).length;
+    if (dados.quantidadeAnexos !== quantidadeAnexosEsperada) {
+      atualizacao.quantidadeAnexos = quantidadeAnexosEsperada;
+    }
+
     if (Object.keys(atualizacao).length > 0) {
       documentosParaAtualizar.push({ id: doc.id, atualizacao });
     }
@@ -156,16 +183,27 @@ async function preencherAnoAutomatico(nomeColecao) {
 
   snapshot.docs.forEach((doc) => {
     const dados = doc.data();
-    if (dados.ano) return; // já tem ano, não mexe
+    const atualizacao = {};
 
-    const correspondencia = (dados.numero || "").match(/(\d{4})/);
-    const anoEncontrado = correspondencia ? parseInt(correspondencia[1], 10) : null;
-    const anoValido = anoEncontrado && anoEncontrado >= 1990 && anoEncontrado <= new Date().getFullYear() + 1;
+    if (!dados.ano) {
+      const correspondencia = (dados.numero || "").match(/(\d{4})/);
+      const anoEncontrado = correspondencia ? parseInt(correspondencia[1], 10) : null;
+      const anoValido = anoEncontrado && anoEncontrado >= 1990 && anoEncontrado <= new Date().getFullYear() + 1;
 
-    if (anoValido) {
-      documentosParaAtualizar.push({ id: doc.id, atualizacao: { ano: anoEncontrado } });
-    } else {
-      naoIdentificados.push(`${dados.numero || "(sem número)"} — ${(dados.objeto || "").slice(0, 60)}`);
+      if (anoValido) {
+        atualizacao.ano = anoEncontrado;
+      } else {
+        naoIdentificados.push(`${dados.numero || "(sem número)"} — ${(dados.objeto || "").slice(0, 60)}`);
+      }
+    }
+
+    const quantidadeAnexosEsperada = (dados.anexos || []).length;
+    if (dados.quantidadeAnexos !== quantidadeAnexosEsperada) {
+      atualizacao.quantidadeAnexos = quantidadeAnexosEsperada;
+    }
+
+    if (Object.keys(atualizacao).length > 0) {
+      documentosParaAtualizar.push({ id: doc.id, atualizacao });
     }
   });
 
@@ -175,6 +213,27 @@ async function preencherAnoAutomatico(nomeColecao) {
     totalRevisados: snapshot.size,
     totalAtualizados: documentosParaAtualizar.length,
     naoIdentificados,
+  };
+}
+
+/** Preenche só a contagem de anexos (usada pelo filtro "Sem anexo") — usado por Licitações */
+async function reindexarQuantidadeAnexos(nomeColecao) {
+  const snapshot = await colecaoEntidade(nomeColecao).get();
+  const documentosParaAtualizar = [];
+
+  snapshot.docs.forEach((doc) => {
+    const dados = doc.data();
+    const quantidadeAnexosEsperada = (dados.anexos || []).length;
+    if (dados.quantidadeAnexos !== quantidadeAnexosEsperada) {
+      documentosParaAtualizar.push({ id: doc.id, atualizacao: { quantidadeAnexos: quantidadeAnexosEsperada } });
+    }
+  });
+
+  await aplicarAtualizacoesEmLotes(nomeColecao, documentosParaAtualizar);
+
+  return {
+    totalRevisados: snapshot.size,
+    totalAtualizados: documentosParaAtualizar.length,
   };
 }
 

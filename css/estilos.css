@@ -134,6 +134,7 @@ input:focus, select:focus, textarea:focus {
 .item-menu:hover { background: var(--azul-claro); }
 .item-menu-ativo { background: var(--azul-principal); color: var(--branco); }
 .icone-menu { margin-right: 8px; }
+.versao-app { font-size: 11px; color: var(--cinza-texto-fraco, var(--cinza-texto)); text-align: center; padding: 12px 8px 4px; }
 
 .area-conteudo { flex: 1; padding: 24px; overflow-y: auto; }
 

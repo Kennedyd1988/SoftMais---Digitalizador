@@ -129,7 +129,23 @@ Documentos Diversos, seguindo o padrão do projeto:
   atual, no mesmo formato de colunas do modelo de importação — útil tanto
   para relatório quanto para reimportar em outra unidade gestora.
 
+## Número da versão visível no app
+
+O app mostra a versão atual (ex: "v2.5") no rodapé do menu lateral e na
+tela de login — útil pra conferir rapidamente se o navegador já está
+com a versão mais recente depois de uma atualização (se o número não
+bater com o que eu informar na entrega, é sinal de cache antigo).
+
+A constante `VERSAO_APP` fica no topo do arquivo `js/core.js`. **Sempre
+que uma entrega alterar código**, essa constante deve ser atualizada
+junto com o número de versão do cache-busting (`?v=`) nos scripts do
+`index.html` — os dois devem ficar sincronizados.
+
 ## Changelog
+
+**v2.6** — Número da versão do app agora fica visível no rodapé do menu
+lateral e na tela de login (ex: "v2.6"), pra facilitar conferir se o
+navegador já está com a versão mais recente depois de uma atualização.
 
 **v2.5** — **Correção real na aba Relatórios**: a API de agregação do
 Firestore (`AggregateField.sum`, `count()`) tem relatos conhecidos de

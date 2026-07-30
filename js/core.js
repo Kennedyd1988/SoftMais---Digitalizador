@@ -2,6 +2,17 @@
 // NÚCLEO DO APP — autenticação, permissões, navegação, utilidades
 // ===================================================================
 
+// ===================================================================
+// VERSÃO DO APP — atualizada a cada entrega, visível no rodapé do menu
+// e na tela de login, para facilitar conferir se o navegador já está
+// com a versão mais recente (ajuda a identificar problema de cache).
+// ===================================================================
+const VERSAO_APP = "2.6";
+document.addEventListener("DOMContentLoaded", () => {
+  const elementoLogin = document.getElementById("versao-app-login");
+  if (elementoLogin) elementoLogin.textContent = `v${VERSAO_APP}`;
+});
+
 // Estado global em memória (não usar localStorage/sessionStorage —
 // mantemos tudo em variáveis JS, recarregadas a cada login)
 const estado = {
@@ -312,6 +323,13 @@ function montarMenuLateral() {
     botao.addEventListener("click", () => navegarPara(item.chave));
     menu.appendChild(botao);
   });
+
+  const rodapeVersao = document.createElement("div");
+  rodapeVersao.className = "versao-app";
+  rodapeVersao.textContent = `SOFT+ Indexação — v${VERSAO_APP}`;
+  menu.appendChild(rodapeVersao);
+
+  document.getElementById("versao-app-login").textContent = `v${VERSAO_APP}`;
 
   navegarPara("inicio");
 }

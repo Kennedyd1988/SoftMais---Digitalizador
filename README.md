@@ -131,6 +131,13 @@ Documentos Diversos, seguindo o padrão do projeto:
 
 ## Changelog
 
+**v2.4** — Adicionada barra de progresso com percentual real durante o
+envio do PDF pro Google Drive. Foi preciso trocar o envio de `fetch`
+para `XMLHttpRequest`, porque o `fetch` não expõe nenhum evento de
+progresso de upload (só avisa quando termina por completo) — o `XHR` é
+a única forma de acompanhar quantos bytes já foram enviados em tempo
+real, mesmo sendo uma API mais antiga.
+
 **v2.3** — **Correção importante nos Relatórios**: o detalhamento
 "Despesas por Unidade Orçamentária" e "por Fonte de Recurso" combinava
 um filtro de intervalo (competência do ano) com um filtro de igualdade

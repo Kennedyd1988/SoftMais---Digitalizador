@@ -32,7 +32,12 @@ function renderizarSecaoAnexos(container, anexosIniciais, nomeModulo, aoMudar, o
           <button type="button" class="botao-secundario" id="btn-selecionar-pdf">+ Adicionar PDF</button>
         </div>
       </div>
-      <div id="status-upload-anexo" class="oculto"></div>
+      <div id="status-upload-anexo" class="oculto">
+        <div class="texto-status-upload" id="texto-status-upload"></div>
+        <div class="barra-progresso-container" id="barra-progresso-container">
+          <div class="barra-progresso-preenchimento" id="barra-progresso-preenchimento" style="width:0%"></div>
+        </div>
+      </div>
       <div id="lista-anexos-por-volume"></div>
     </div>
   `;
@@ -40,6 +45,9 @@ function renderizarSecaoAnexos(container, anexosIniciais, nomeModulo, aoMudar, o
   const inputArquivo = container.querySelector("#campo-arquivo-pdf");
   const botaoSelecionar = container.querySelector("#btn-selecionar-pdf");
   const statusUpload = container.querySelector("#status-upload-anexo");
+  const textoStatusUpload = container.querySelector("#texto-status-upload");
+  const barraProgressoContainer = container.querySelector("#barra-progresso-container");
+  const barraProgressoPreenchimento = container.querySelector("#barra-progresso-preenchimento");
 
   botaoSelecionar.addEventListener("click", () => inputArquivo.click());
 
@@ -55,10 +63,13 @@ function renderizarSecaoAnexos(container, anexosIniciais, nomeModulo, aoMudar, o
 
     botaoSelecionar.disabled = true;
     statusUpload.classList.remove("oculto");
+    barraProgressoPreenchimento.style.width = "0%";
 
     try {
-      const novoAnexo = await enviarPdfParaDrive(arquivo, nomeModulo, (mensagem) => {
-        statusUpload.textContent = mensagem;
+      const novoAnexo = await enviarPdfParaDrive(arquivo, nomeModulo, (mensagem, percentual) => {
+        textoStatusUpload.textContent =
+          percentual !== undefined ? `${mensagem} ${percentual}%` : mensagem;
+        barraProgressoPreenchimento.style.width = `${percentual ?? 0}%`;
       });
       novoAnexo.volume = volume;
       anexos.push(novoAnexo);
@@ -71,6 +82,7 @@ function renderizarSecaoAnexos(container, anexosIniciais, nomeModulo, aoMudar, o
     } finally {
       botaoSelecionar.disabled = false;
       statusUpload.classList.add("oculto");
+      barraProgressoPreenchimento.style.width = "0%";
       inputArquivo.value = "";
     }
   }

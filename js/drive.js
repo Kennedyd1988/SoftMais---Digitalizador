@@ -103,7 +103,6 @@ async function enviarPdfParaDrive(arquivo, nomeModulo, aoProgredir) {
   const token = await obterAccessTokenDrive();
   const pastaId = await obterOuCriarPastaModulo(nomeModulo);
 
-  aoProgredir?.("Enviando arquivo...");
   const metadados = {
     name: arquivo.name,
     parents: [pastaId],
@@ -122,22 +121,16 @@ async function enviarPdfParaDrive(arquivo, nomeModulo, aoProgredir) {
 
   const corpoCompleto = new Blob([corpo, bytesArquivo, rodape]);
 
-  const resposta = await fetch(
+  aoProgredir?.("Enviando arquivo...", 0);
+  const dados = await enviarComProgresso(
     "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id",
     {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": `multipart/related; boundary=${limite}`,
-      },
-      body: corpoCompleto,
-    }
+      Authorization: `Bearer ${token}`,
+      "Content-Type": `multipart/related; boundary=${limite}`,
+    },
+    corpoCompleto,
+    (percentual) => aoProgredir?.("Enviando arquivo...", percentual)
   );
-
-  const dados = await resposta.json();
-  if (!resposta.ok) {
-    throw new Error(dados.error?.message || "Falha ao enviar o arquivo para o Drive.");
-  }
 
   return {
     driveFileId: dados.id,
@@ -147,6 +140,44 @@ async function enviarPdfParaDrive(arquivo, nomeModulo, aoProgredir) {
     dataUpload: new Date().toISOString(),
     usuarioUpload: estado.usuario.email,
   };
+}
+
+/**
+ * Envia dados via XMLHttpRequest (em vez de fetch), porque só o XHR
+ * expõe o evento de progresso do upload (fetch não avisa quantos bytes
+ * já foram enviados, só quando termina por completo).
+ */
+function enviarComProgresso(url, cabecalhos, corpo, aoProgresso) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    Object.entries(cabecalhos).forEach(([nome, valor]) => xhr.setRequestHeader(nome, valor));
+
+    xhr.upload.onprogress = (evento) => {
+      if (evento.lengthComputable) {
+        aoProgresso(Math.round((evento.loaded / evento.total) * 100));
+      }
+    };
+
+    xhr.onload = () => {
+      let dados;
+      try {
+        dados = JSON.parse(xhr.responseText);
+      } catch (erro) {
+        dados = {};
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        aoProgresso(100);
+        resolve(dados);
+      } else {
+        reject(new Error(dados.error?.message || "Falha ao enviar o arquivo para o Drive."));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error("Erro de rede ao enviar o arquivo. Verifique sua conexão."));
+
+    xhr.send(corpo);
+  });
 }
 
 /** Abre o PDF numa aba nova, buscando os bytes com autenticação */

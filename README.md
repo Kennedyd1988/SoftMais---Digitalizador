@@ -143,6 +143,14 @@ junto com o número de versão do cache-busting (`?v=`) nos scripts do
 
 ## Changelog
 
+**v2.7** — Reestruturada a aba Relatórios, por pedido do cliente: em
+vez do valor em R$ e do detalhamento por Unidade Orçamentária/Fonte de
+Recurso, agora mostra uma única tabela dividida por tipo (Processos de
+Despesa, Licitações, Legislação, Documentos Diversos) com três colunas:
+quantidade de registros, quantidade de arquivos PDF anexados e
+quantidade de páginas — mais uma linha de total geral. O PDF exportado
+segue o mesmo formato.
+
 **v2.6** — Número da versão do app agora fica visível no rodapé do menu
 lateral e na tela de login (ex: "v2.6"), pra facilitar conferir se o
 navegador já está com a versão mais recente depois de uma atualização.

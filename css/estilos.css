@@ -259,6 +259,7 @@ input:focus, select:focus, textarea:focus {
 .tabela-relatorio td:nth-child(2), .tabela-relatorio td:nth-child(3) { text-align: right; }
 .tabela-relatorio th { background: var(--ink); color: var(--cinza-texto); font-weight: 600; }
 .tabela-relatorio tr:last-child td { border-bottom: none; }
+.linha-total-relatorio td { font-weight: 700; color: var(--azul-principal); border-top: 2px solid var(--cinza-borda); }
 
 /* ---------- MANUTENÇÃO ---------- */
 .cartao-manutencao { background: var(--branco); border: 1px solid var(--cinza-borda); border-radius: var(--raio, 10px); padding: 18px; margin-bottom: 16px; max-width: 640px; }

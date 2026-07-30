@@ -13,8 +13,12 @@
  * @param {string} nomeModulo - usado para organizar as pastas no Drive
  * @param {Function} aoMudar - chamado sempre que a lista de anexos muda,
  *                             recebe a lista atualizada
+ * @param {Function} [obterNomeBase] - função que lê os campos atuais do
+ *   formulário e devolve um texto (ex: "Empenho-203002-Fulano") usado
+ *   para renomear o PDF automaticamente. Se não for informada, mantém
+ *   o nome original do arquivo enviado.
  */
-function renderizarSecaoAnexos(container, anexosIniciais, nomeModulo, aoMudar) {
+function renderizarSecaoAnexos(container, anexosIniciais, nomeModulo, aoMudar, obterNomeBase = null) {
   let anexos = [...(anexosIniciais || [])];
 
   container.innerHTML = `
@@ -39,10 +43,15 @@ function renderizarSecaoAnexos(container, anexosIniciais, nomeModulo, aoMudar) {
 
   botaoSelecionar.addEventListener("click", () => inputArquivo.click());
 
-  inputArquivo.addEventListener("change", async () => {
+  inputArquivo.addEventListener("change", () => {
     const arquivo = inputArquivo.files[0];
     if (!arquivo) return;
+    processarNovoArquivo(arquivo);
+  });
+
+  async function processarNovoArquivo(arquivoOriginal) {
     const volume = parseInt(container.querySelector("#campo-volume").value, 10) || 1;
+    const arquivo = renomearConformeCadastro(arquivoOriginal, volume);
 
     botaoSelecionar.disabled = true;
     statusUpload.classList.remove("oculto");
@@ -64,7 +73,22 @@ function renderizarSecaoAnexos(container, anexosIniciais, nomeModulo, aoMudar) {
       statusUpload.classList.add("oculto");
       inputArquivo.value = "";
     }
-  });
+  }
+
+  /** Renomeia o PDF com base nos dados já digitados no formulário no momento do envio */
+  function renomearConformeCadastro(arquivo, volume) {
+    if (!obterNomeBase) return arquivo;
+
+    const nomeBase = sanitizarNomeArquivo(obterNomeBase());
+    if (!nomeBase) return arquivo; // campos ainda vazios — mantém o nome original
+
+    // Evita nomes repetidos quando já existe mais de um anexo no mesmo volume
+    const quantosNesseVolume = anexos.filter((a) => (a.volume || 1) === volume).length;
+    const sufixo = quantosNesseVolume > 0 ? `-${quantosNesseVolume + 1}` : "";
+    const nomeFinal = `${nomeBase}-Vol${volume}${sufixo}.pdf`;
+
+    return new File([arquivo], nomeFinal, { type: arquivo.type || "application/pdf" });
+  }
 
   function redesenharListaAnexos() {
     const listaEl = container.querySelector("#lista-anexos-por-volume");
@@ -133,6 +157,18 @@ function renderizarSecaoAnexos(container, anexosIniciais, nomeModulo, aoMudar) {
   return {
     obterAnexos: () => anexos,
   };
+}
+
+/** Transforma um texto livre num nome de arquivo seguro (sem acento, sem caractere especial) */
+function sanitizarNomeArquivo(texto) {
+  return (texto || "")
+    .toString()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // remove acentos
+    .replace(/[^a-zA-Z0-9]+/g, "-") // troca tudo que não for letra/número por hífen
+    .replace(/-+/g, "-") // colapsa hífens repetidos
+    .replace(/^-|-$/g, "") // remove hífen do início/fim
+    .slice(0, 80);
 }
 
 function formatarTamanhoArquivo(bytes) {

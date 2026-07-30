@@ -188,7 +188,12 @@ async function renderizarLicitacoes(area) {
       modal.querySelector("#secao-anexos"),
       registro?.anexos,
       "licitacoes",
-      () => {}
+      () => {},
+      () => {
+        const numero = document.getElementById("campo-numero")?.value.trim();
+        const ano = document.getElementById("campo-ano")?.value.trim();
+        return numero && ano ? `Licitacao-${numero}-${ano}` : "";
+      }
     );
   }
 
@@ -392,7 +397,14 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
       modal.querySelector("#secao-anexos"),
       registro?.anexos,
       nomeColecao,
-      () => {}
+      () => {},
+      () => {
+        const campoTipo = document.getElementById("campo-tipo");
+        const tipoTexto = campoTipo?.selectedOptions[0]?.text || "";
+        const numero = document.getElementById("campo-numero")?.value.trim();
+        const ano = document.getElementById("campo-ano")?.value.trim();
+        return tipoTexto && numero && tipoTexto !== "Selecione..." ? `${tipoTexto}-${numero}${ano ? "-" + ano : ""}` : "";
+      }
     );
   }
 
@@ -773,7 +785,12 @@ async function renderizarDespesas(area) {
       modal.querySelector("#secao-anexos"),
       registro?.anexos,
       "processosDespesa",
-      () => {}
+      () => {},
+      () => {
+        const numeroEmpenho = document.getElementById("campo-numero-empenho")?.value.trim();
+        const credorNome = document.getElementById("campo-credor-busca")?.value.trim();
+        return numeroEmpenho ? `Empenho-${numeroEmpenho}${credorNome ? "-" + credorNome : ""}` : "";
+      }
     );
 
     configurarAutocomplete({

@@ -131,6 +131,31 @@ Documentos Diversos, seguindo o padrão do projeto:
 
 ## Changelog
 
+**v2.2** — Removido o botão "📷 Digitalizar" (captura por câmera) por
+decisão do cliente. A renomeação automática do PDF com base nos dados
+do cadastro (v2.1) continua funcionando normalmente pro botão "+
+Adicionar PDF".
+
+**v2.1** — PDFs anexados agora são renomeados automaticamente com base
+nos dados do cadastro em que estão sendo indexados (ex: um anexo de
+despesa vira `Empenho-203002-Francisca-Cristiana-Vol1.pdf` em vez de
+manter o nome original do arquivo/foto). Funciona tanto pra upload comum
+quanto pra digitalização pela câmera. Se os campos principais do
+formulário ainda estiverem vazios no momento do envio, mantém o nome
+original (não força um nome incompleto).
+
+**v2.0** — Novo botão **📷 Digitalizar** na seção de anexos: tira fotos
+pela câmera (celular ou webcam do PC), permite capturar várias páginas,
+remove página errada antes de finalizar, monta um PDF automaticamente e
+mostra uma prévia — só vira anexo de verdade depois de "Usar este
+documento". **Limitação conhecida, documentada por transparência**: não
+é possível integrar com scanners físicos (TWAIN/WIA) direto do
+navegador — essa tecnologia não existe em nenhum navegador moderno sem
+instalar um serviço adicional pago no computador, o que fugiria do
+conceito de app 100% estático deste projeto. Pra usar um scanner de
+mesa, o caminho é digitalizar pelo programa do próprio scanner e depois
+anexar o PDF gerado pelo botão "+ Adicionar PDF" (que já funciona).
+
 **v1.9** — Nova aba **Manutenção** (só administrador): ferramenta de
 reindexação em massa. "Reindexar Processos de Despesa" varre todos os
 registros e recalcula os campos de busca (número do empenho, ordem de

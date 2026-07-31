@@ -210,6 +210,22 @@ está tudo certo.
 
 ## Changelog
 
+**v4.7** — Mudança importante nas 4 telas com anexo (Licitações,
+Despesas, Legislação, Documentos Diversos):
+- **Filtros combináveis**: busca por texto, filtro de ano e "Sem
+  anexo"/"Com anexo" agora funcionam **juntos**, em vez de um resetar o
+  outro. Por trás dos panos, só um vira consulta ao Firestore (o mais
+  restritivo disponível) e os demais são aplicados em cima do resultado,
+  no navegador — assim combinam sem precisar de nenhum índice composto
+  novo.
+- **Busca ampliada**: Despesas passou a buscar também por Elemento de
+  Despesa (além de empenho, ordem de pagamento, credor e objeto).
+  Legislação e Documentos Diversos passaram a buscar por Número também
+  (antes só buscavam por Objeto) — precisou de um campo novo
+  (`numeroNormalizado`), então registros cadastrados antes dessa versão
+  só aparecem nessa busca depois de reindexados (Manutenção → Reindexar
+  Legislação/Documentos Diversos).
+
 **v4.6** — "Licitação de origem" virou obrigatória no cadastro de
 Processo de Despesa — ou você vincula uma licitação, ou marca a nova
 caixa **"Processo sem licitação vinculada"**, que libera salvar sem

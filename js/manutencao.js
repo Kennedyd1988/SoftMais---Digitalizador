@@ -659,6 +659,11 @@ async function preencherAnoAutomatico(nomeColecao, aoProgredir) {
       }
     }
 
+    const numeroNormalizadoEsperado = normalizarTexto(dados.numero || "");
+    if (dados.numeroNormalizado !== numeroNormalizadoEsperado) {
+      atualizacao.numeroNormalizado = numeroNormalizadoEsperado;
+    }
+
     const quantidadeAnexosEsperada = (dados.anexos || []).length;
     if (dados.quantidadeAnexos !== quantidadeAnexosEsperada) {
       atualizacao.quantidadeAnexos = quantidadeAnexosEsperada;

@@ -7,6 +7,69 @@ function temAnexo(registro) {
   return (registro.quantidadeAnexos ?? (registro.anexos || []).length) > 0;
 }
 
+// -------------------------------------------------------------
+// FILTROS COMBINÁVEIS (busca + ano + sem/com anexo, ao mesmo tempo)
+// -------------------------------------------------------------
+// O Firestore só permite um filtro "forte" (intervalo/desigualdade) por
+// consulta sem precisar de índice composto. Por isso, em vez de mandar
+// os três filtros juntos pro banco, escolhemos qual deles vira a
+// consulta principal (o mais restritivo disponível) e aplicamos os
+// outros filtros ativos em cima do resultado já buscado, no navegador.
+// Isso permite os três funcionarem juntos sem precisar criar nenhum
+// índice novo no Firestore.
+
+function filtrarPorAnoClientSide(registros, ano) {
+  if (!ano) return registros;
+  return registros.filter((r) => String(r.ano) === String(ano));
+}
+
+function filtrarPorCompetenciaClientSide(registros, ano) {
+  if (!ano) return registros;
+  return registros.filter((r) => (r.competenciaKey || "").startsWith(String(ano)));
+}
+
+function filtrarPorAnexoClientSide(registros, filtroAnexo) {
+  if (!filtroAnexo) return registros;
+  return filtroAnexo === "sem" ? registros.filter((r) => !temAnexo(r)) : registros.filter((r) => temAnexo(r));
+}
+
+function filtrarPorTextoClientSide(registros, termo, campos) {
+  if (!termo) return registros;
+  const termoNorm = normalizarTexto(termo);
+  return registros.filter((r) => campos.some((campo) => (r[campo] || "").toString().toLowerCase().includes(termoNorm)));
+}
+
+/**
+ * Liga os botões "Sem anexo"/"Com anexo" — só controla o próprio estado
+ * (mutuamente exclusivos entre si) e avisa quando muda, através do
+ * callback `aoMudar`. Não mexe mais em busca/ano — isso permite os três
+ * filtros ficarem ativos ao mesmo tempo.
+ */
+function configurarFiltrosAnexo(aoMudar) {
+  const botaoSem = document.getElementById("btn-filtro-sem-anexo");
+  const botaoCom = document.getElementById("btn-filtro-com-anexo");
+  let ativo = null; // 'sem' | 'com' | null
+
+  function alternar(novo) {
+    ativo = ativo === novo ? null : novo;
+    botaoSem.classList.toggle("botao-filtro-ativo", ativo === "sem");
+    botaoCom.classList.toggle("botao-filtro-ativo", ativo === "com");
+    aoMudar();
+  }
+
+  botaoSem.addEventListener("click", () => alternar("sem"));
+  botaoCom.addEventListener("click", () => alternar("com"));
+
+  return {
+    obterAtivo: () => ativo,
+    resetar() {
+      ativo = null;
+      botaoSem.classList.remove("botao-filtro-ativo");
+      botaoCom.classList.remove("botao-filtro-ativo");
+    },
+  };
+}
+
 /** HTML da barra flutuante que aparece quando algum registro é selecionado pra exportação em lote (item 7) */
 function htmlBarraSelecaoExportacao() {
   return `
@@ -328,50 +391,6 @@ function gerarOpcoesAno(anoSelecionado) {
   return html;
 }
 
-/**
- * Liga os botões "Sem anexo" e "Com anexo" a consultas que filtram por
- * quantidadeAnexos. Só um dos dois fica ativo por vez (clicar de novo
- * desativa). Reaproveitado pelos 4 módulos com anexo.
- */
-function configurarFiltrosAnexo(nomeColecao, definirPaginador, carregarPagina) {
-  const botaoSem = document.getElementById("btn-filtro-sem-anexo");
-  const botaoCom = document.getElementById("btn-filtro-com-anexo");
-  let filtroAtivo = null; // 'sem' | 'com' | null
-
-  function aplicar(novoFiltro) {
-    filtroAtivo = filtroAtivo === novoFiltro ? null : novoFiltro;
-    botaoSem.classList.toggle("botao-filtro-ativo", filtroAtivo === "sem");
-    botaoCom.classList.toggle("botao-filtro-ativo", filtroAtivo === "com");
-    document.getElementById("campo-busca").value = "";
-    const seletorAno = document.getElementById("filtro-ano");
-    if (seletorAno) seletorAno.value = "";
-
-    let consulta;
-    if (filtroAtivo === "sem") {
-      consulta = colecaoEntidade(nomeColecao).where("quantidadeAnexos", "==", 0).orderBy("criadoEm", "desc");
-    } else if (filtroAtivo === "com") {
-      // Filtro de desigualdade (>0) exige que o orderBy comece pelo
-      // mesmo campo — por isso ordena por quantidadeAnexos, não por data.
-      consulta = colecaoEntidade(nomeColecao).where("quantidadeAnexos", ">", 0).orderBy("quantidadeAnexos", "desc");
-    } else {
-      consulta = colecaoEntidade(nomeColecao).orderBy("criadoEm", "desc");
-    }
-    definirPaginador(criarPaginador(consulta));
-    carregarPagina(true);
-  }
-
-  botaoSem.addEventListener("click", () => aplicar("sem"));
-  botaoCom.addEventListener("click", () => aplicar("com"));
-
-  return {
-    desativar() {
-      filtroAtivo = null;
-      botaoSem.classList.remove("botao-filtro-ativo");
-      botaoCom.classList.remove("botao-filtro-ativo");
-    },
-  };
-}
-
 /** Carrega uma lista pequena de cadastro (modalidade, unidade orç., etc.) para popular um <select> */
 async function carregarOpcoesSelect(nomeColecao) {
   const snapshot = await colecaoEntidade(nomeColecao).orderBy("nomeNormalizado").limit(500).get();
@@ -621,24 +640,61 @@ async function renderizarLicitacoes(area) {
 
   document.getElementById("btn-novo")?.addEventListener("click", () => abrirFormulario());
   document.getElementById("btn-carregar-mais").addEventListener("click", () => carregarPagina(false));
-  configurarBuscaMultiCampoLicitacoes(paginador, carregarPagina, criarCartao);
 
-  const filtrosAnexo = configurarFiltrosAnexo(
-    "licitacoes",
-    (novoPaginador) => { paginador = novoPaginador; },
-    carregarPagina
-  );
+  const filtrosAnexo = configurarFiltrosAnexo(() => aplicarFiltrosLicitacoes());
 
-  document.getElementById("filtro-ano").addEventListener("change", (evento) => {
-    document.getElementById("campo-busca").value = "";
-    filtrosAnexo.desativar();
-    const ano = evento.target.value;
-    const consulta = ano
-      ? colecaoEntidade("licitacoes").where("ano", "==", parseInt(ano, 10)).orderBy("criadoEm", "desc")
-      : colecaoEntidade("licitacoes").orderBy("criadoEm", "desc");
-    paginador = criarPaginador(consulta);
-    carregarPagina(true);
+  async function aplicarFiltrosLicitacoes() {
+    const termoOriginal = document.getElementById("campo-busca").value.trim();
+    const ano = document.getElementById("filtro-ano").value;
+    const filtroAnexo = filtrosAnexo.obterAtivo();
+    const lista = document.getElementById("lista-registros");
+    const botaoMais = document.getElementById("btn-carregar-mais");
+
+    // Nenhum filtro ativo: volta pro comportamento padrão paginado
+    if (!termoOriginal && !ano && !filtroAnexo) {
+      paginador = criarPaginador(colecaoEntidade("licitacoes").orderBy("criadoEm", "desc"));
+      carregarPagina(true);
+      return;
+    }
+
+    botaoMais.classList.add("oculto");
+    lista.innerHTML = "";
+
+    try {
+      let registros;
+      // Escolhe a consulta principal (a mais restritiva disponível) e
+      // aplica os demais filtros ativos em cima do resultado, no navegador.
+      if (termoOriginal) {
+        registros = await buscarLicitacoesMultiCampoArray(termoOriginal);
+        registros = filtrarPorAnoClientSide(registros, ano);
+        registros = filtrarPorAnexoClientSide(registros, filtroAnexo);
+      } else if (ano) {
+        const snapshot = await colecaoEntidade("licitacoes").where("ano", "==", parseInt(ano, 10)).get();
+        registros = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        registros = filtrarPorAnexoClientSide(registros, filtroAnexo);
+      } else {
+        const consulta = filtroAnexo === "sem"
+          ? colecaoEntidade("licitacoes").where("quantidadeAnexos", "==", 0)
+          : colecaoEntidade("licitacoes").where("quantidadeAnexos", ">", 0);
+        const snapshot = await consulta.get();
+        registros = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      }
+
+      registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
+      if (registros.length === 0) {
+        lista.innerHTML = `<p class="texto-secundario">Nenhum resultado encontrado.</p>`;
+      }
+    } catch (erro) {
+      tratarErroConsultaFirestore(erro);
+    }
+  }
+
+  let temporizadorBuscaLicitacoes;
+  document.getElementById("campo-busca").addEventListener("input", () => {
+    clearTimeout(temporizadorBuscaLicitacoes);
+    temporizadorBuscaLicitacoes = setTimeout(() => aplicarFiltrosLicitacoes(), 300);
   });
+  document.getElementById("filtro-ano").addEventListener("change", () => aplicarFiltrosLicitacoes());
 
   carregarPagina(true);
 
@@ -701,7 +757,9 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
         if (!ano) throw new Error("Ano é obrigatório.");
         if (!objeto) throw new Error("Objeto é obrigatório.");
         return {
-          tipoId, numero, ano, objeto,
+          tipoId, numero,
+          numeroNormalizado: normalizarTexto(numero),
+          ano, objeto,
           objetoNormalizado: normalizarTexto(objeto),
           anexos: [],
           quantidadeAnexos: 0,
@@ -803,6 +861,7 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
         const dados = {
           tipoId: campoTipo.value,
           numero: campoNumero.value.trim(),
+          numeroNormalizado: normalizarTexto(campoNumero.value),
           ano: parseInt(campoAno.value, 10),
           objeto: campoObjeto.value.trim(),
           objetoNormalizado: normalizarTexto(campoObjeto.value),
@@ -853,24 +912,74 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
 
   document.getElementById("btn-novo")?.addEventListener("click", () => abrirFormulario());
   document.getElementById("btn-carregar-mais").addEventListener("click", () => carregarPagina(false));
-  configurarBuscaGenerica(nomeColecao, criarCartao, paginador, carregarPagina, "objetoNormalizado");
 
-  const filtrosAnexo = configurarFiltrosAnexo(
-    nomeColecao,
-    (novoPaginador) => { paginador = novoPaginador; },
-    carregarPagina
-  );
+  const filtrosAnexo = configurarFiltrosAnexo(() => aplicarFiltrosModulo());
 
-  document.getElementById("filtro-ano").addEventListener("change", (evento) => {
-    document.getElementById("campo-busca").value = "";
-    filtrosAnexo.desativar();
-    const ano = evento.target.value;
-    const consulta = ano
-      ? colecaoEntidade(nomeColecao).where("ano", "==", parseInt(ano, 10)).orderBy("criadoEm", "desc")
-      : colecaoEntidade(nomeColecao).orderBy("criadoEm", "desc");
-    paginador = criarPaginador(consulta);
-    carregarPagina(true);
+  async function aplicarFiltrosModulo() {
+    const termo = document.getElementById("campo-busca").value.trim();
+    const ano = document.getElementById("filtro-ano").value;
+    const filtroAnexo = filtrosAnexo.obterAtivo();
+    const lista = document.getElementById("lista-registros");
+    const botaoMais = document.getElementById("btn-carregar-mais");
+
+    if (!termo && !ano && !filtroAnexo) {
+      paginador = criarPaginador(colecaoEntidade(nomeColecao).orderBy("criadoEm", "desc"));
+      carregarPagina(true);
+      return;
+    }
+
+    botaoMais.classList.add("oculto");
+    lista.innerHTML = "";
+
+    try {
+      let registros;
+      if (termo) {
+        const termoNormalizado = normalizarTexto(termo);
+        const consultas = ["numeroNormalizado", "objetoNormalizado"].map((campo) =>
+          colecaoEntidade(nomeColecao)
+            .orderBy(campo)
+            .startAt(termoNormalizado)
+            .endAt(termoNormalizado + "\uf8ff")
+            .limit(TAMANHO_PAGINA)
+            .get()
+        );
+        const resultadosPorConsulta = await Promise.all(consultas);
+        const encontrados = new Map();
+        resultadosPorConsulta.forEach((snapshot) => {
+          snapshot.docs.forEach((doc) => {
+            if (!encontrados.has(doc.id)) encontrados.set(doc.id, { id: doc.id, ...doc.data() });
+          });
+        });
+        registros = [...encontrados.values()];
+        registros = filtrarPorAnoClientSide(registros, ano);
+        registros = filtrarPorAnexoClientSide(registros, filtroAnexo);
+      } else if (ano) {
+        const snapshot = await colecaoEntidade(nomeColecao).where("ano", "==", parseInt(ano, 10)).get();
+        registros = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        registros = filtrarPorAnexoClientSide(registros, filtroAnexo);
+      } else {
+        const consulta = filtroAnexo === "sem"
+          ? colecaoEntidade(nomeColecao).where("quantidadeAnexos", "==", 0)
+          : colecaoEntidade(nomeColecao).where("quantidadeAnexos", ">", 0);
+        const snapshot = await consulta.get();
+        registros = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      }
+
+      registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
+      if (registros.length === 0) {
+        lista.innerHTML = `<p class="texto-secundario">Nenhum resultado encontrado.</p>`;
+      }
+    } catch (erro) {
+      tratarErroConsultaFirestore(erro);
+    }
+  }
+
+  let temporizadorBuscaModulo;
+  document.getElementById("campo-busca").addEventListener("input", () => {
+    clearTimeout(temporizadorBuscaModulo);
+    temporizadorBuscaModulo = setTimeout(() => aplicarFiltrosModulo(), 300);
   });
+  document.getElementById("filtro-ano").addEventListener("change", () => aplicarFiltrosModulo());
 
   carregarPagina(true);
 }
@@ -1308,27 +1417,62 @@ async function renderizarDespesas(area) {
 
   document.getElementById("btn-novo")?.addEventListener("click", () => abrirFormulario());
   document.getElementById("btn-carregar-mais").addEventListener("click", () => carregarPagina(false));
-  configurarBuscaMultiCampoDespesas(paginador, carregarPagina, criarCartao);
 
-  const filtrosAnexo = configurarFiltrosAnexo(
-    "processosDespesa",
-    (novoPaginador) => { paginador = novoPaginador; },
-    carregarPagina
-  );
+  const filtrosAnexo = configurarFiltrosAnexo(() => aplicarFiltrosDespesas());
 
-  document.getElementById("filtro-ano").addEventListener("change", (evento) => {
-    document.getElementById("campo-busca").value = "";
-    filtrosAnexo.desativar();
-    const ano = evento.target.value;
-    const consulta = ano
-      ? colecaoEntidade("processosDespesa")
+  async function aplicarFiltrosDespesas() {
+    const termo = document.getElementById("campo-busca").value.trim();
+    const ano = document.getElementById("filtro-ano").value;
+    const filtroAnexo = filtrosAnexo.obterAtivo();
+    const lista = document.getElementById("lista-registros");
+    const botaoMais = document.getElementById("btn-carregar-mais");
+
+    if (!termo && !ano && !filtroAnexo) {
+      paginador = criarPaginador(colecaoEntidade("processosDespesa").orderBy("criadoEm", "desc"));
+      carregarPagina(true);
+      return;
+    }
+
+    botaoMais.classList.add("oculto");
+    lista.innerHTML = "";
+
+    try {
+      let registros;
+      if (termo) {
+        registros = await buscarDespesasMultiCampoArray(termo);
+        registros = filtrarPorCompetenciaClientSide(registros, ano);
+        registros = filtrarPorAnexoClientSide(registros, filtroAnexo);
+      } else if (ano) {
+        const snapshot = await colecaoEntidade("processosDespesa")
           .orderBy("competenciaKey")
           .startAt(`${ano}-01`)
           .endAt(`${ano}-12`)
-      : colecaoEntidade("processosDespesa").orderBy("criadoEm", "desc");
-    paginador = criarPaginador(consulta);
-    carregarPagina(true);
+          .get();
+        registros = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        registros = filtrarPorAnexoClientSide(registros, filtroAnexo);
+      } else {
+        const consulta = filtroAnexo === "sem"
+          ? colecaoEntidade("processosDespesa").where("quantidadeAnexos", "==", 0)
+          : colecaoEntidade("processosDespesa").where("quantidadeAnexos", ">", 0);
+        const snapshot = await consulta.get();
+        registros = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      }
+
+      registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
+      if (registros.length === 0) {
+        lista.innerHTML = `<p class="texto-secundario">Nenhum resultado encontrado.</p>`;
+      }
+    } catch (erro) {
+      tratarErroConsultaFirestore(erro);
+    }
+  }
+
+  let temporizadorBuscaDespesas;
+  document.getElementById("campo-busca").addEventListener("input", () => {
+    clearTimeout(temporizadorBuscaDespesas);
+    temporizadorBuscaDespesas = setTimeout(() => aplicarFiltrosDespesas(), 300);
   });
+  document.getElementById("filtro-ano").addEventListener("change", () => aplicarFiltrosDespesas());
 
   carregarPagina(true);
 
@@ -1353,124 +1497,97 @@ async function renderizarDespesas(area) {
  * um ano (4 dígitos), soma também uma busca exata por ano. Junta tudo
  * sem duplicar.
  */
-function configurarBuscaMultiCampoLicitacoes(paginador, carregarPagina, criarCartao) {
-  let temporizador;
-  document.getElementById("campo-busca").addEventListener("input", (evento) => {
-    clearTimeout(temporizador);
-    temporizador = setTimeout(async () => {
-      const termoOriginal = evento.target.value.trim();
-      // Aceita tanto digitar só o número ("015") quanto o formato
-      // completo "015/2026" — nesse segundo caso, número e ano precisam
-      // bater os dois ao mesmo tempo (não é "ou", é "e").
-      const [parteNumero, parteAno] = termoOriginal.split("/").map((p) => p.trim());
-      const termo = normalizarTexto(parteNumero);
-      const anoValido = /^\d{4}$/.test(parteAno || "");
-      const lista = document.getElementById("lista-registros");
-      lista.innerHTML = "";
-      if (!termo) {
-        paginador.reiniciar();
-        carregarPagina(true);
-        return;
-      }
+/**
+ * Busca licitações por número, modalidade e objeto (e, se digitado no
+ * formato "número/ano", filtra os dois juntos). Devolve um array, pra
+ * poder ser combinada com outros filtros (ano, sem/com anexo) em cima
+ * do resultado.
+ */
+async function buscarLicitacoesMultiCampoArray(termoOriginal) {
+  const [parteNumero, parteAno] = termoOriginal.split("/").map((p) => p.trim());
+  const termo = normalizarTexto(parteNumero);
+  const anoValido = /^\d{4}$/.test(parteAno || "");
+  if (!termo) return [];
 
-      try {
-        let encontrados = new Map();
+  const encontrados = new Map();
 
-        if (anoValido) {
-          // Formato "número/ano": busca só por número (prefixo) e depois
-          // filtra pelo ano no próprio navegador — evita precisar de um
-          // índice composto no Firestore pra cruzar prefixo + igualdade.
-          const snapshot = await colecaoEntidade("licitacoes")
-            .orderBy("numeroNormalizado")
-            .startAt(termo)
-            .endAt(termo + "\uf8ff")
-            .limit(TAMANHO_PAGINA)
-            .get();
-          const anoNumero = parseInt(parteAno, 10);
-          snapshot.docs
-            .map((doc) => ({ id: doc.id, ...doc.data() }))
-            .filter((registro) => registro.ano === anoNumero)
-            .forEach((registro) => encontrados.set(registro.id, registro));
-        } else {
-          // Busca geral: número OU modalidade OU objeto batendo o termo
-          // (e, se o termo inteiro for um ano de 4 dígitos, também ano)
-          const consultas = ["numeroNormalizado", "modalidadeNomeNormalizado", "objetoNormalizado"].map((campo) =>
-            colecaoEntidade("licitacoes")
-              .orderBy(campo)
-              .startAt(termo)
-              .endAt(termo + "\uf8ff")
-              .limit(TAMANHO_PAGINA)
-              .get()
-          );
-          if (/^\d{4}$/.test(termoOriginal)) {
-            consultas.push(colecaoEntidade("licitacoes").where("ano", "==", parseInt(termoOriginal, 10)).limit(TAMANHO_PAGINA).get());
-          }
-          const resultadosPorConsulta = await Promise.all(consultas);
-          resultadosPorConsulta.forEach((snapshot) => {
-            snapshot.docs.forEach((doc) => {
-              if (!encontrados.has(doc.id)) encontrados.set(doc.id, { id: doc.id, ...doc.data() });
-            });
-          });
-        }
+  if (anoValido) {
+    // Formato "número/ano": busca só por número (prefixo) e depois
+    // filtra pelo ano no próprio navegador — evita precisar de um
+    // índice composto no Firestore pra cruzar prefixo + igualdade.
+    const snapshot = await colecaoEntidade("licitacoes")
+      .orderBy("numeroNormalizado")
+      .startAt(termo)
+      .endAt(termo + "\uf8ff")
+      .limit(TAMANHO_PAGINA)
+      .get();
+    const anoNumero = parseInt(parteAno, 10);
+    snapshot.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() }))
+      .filter((registro) => registro.ano === anoNumero)
+      .forEach((registro) => encontrados.set(registro.id, registro));
+  } else {
+    // Busca geral: número OU modalidade OU objeto batendo o termo
+    // (e, se o termo inteiro for um ano de 4 dígitos, também ano)
+    const consultas = ["numeroNormalizado", "modalidadeNomeNormalizado", "objetoNormalizado"].map((campo) =>
+      colecaoEntidade("licitacoes")
+        .orderBy(campo)
+        .startAt(termo)
+        .endAt(termo + "\uf8ff")
+        .limit(TAMANHO_PAGINA)
+        .get()
+    );
+    if (/^\d{4}$/.test(termoOriginal)) {
+      consultas.push(colecaoEntidade("licitacoes").where("ano", "==", parseInt(termoOriginal, 10)).limit(TAMANHO_PAGINA).get());
+    }
+    const resultadosPorConsulta = await Promise.all(consultas);
+    resultadosPorConsulta.forEach((snapshot) => {
+      snapshot.docs.forEach((doc) => {
+        if (!encontrados.has(doc.id)) encontrados.set(doc.id, { id: doc.id, ...doc.data() });
+      });
+    });
+  }
 
-        encontrados.forEach((registro) => lista.appendChild(criarCartao(registro)));
-        if (encontrados.size === 0) {
-          lista.innerHTML = `<p class="texto-secundario">Nenhum resultado encontrado.</p>`;
-        }
-        document.getElementById("btn-carregar-mais").classList.add("oculto");
-      } catch (erro) {
-        tratarErroConsultaFirestore(erro);
-      }
-    }, 300);
-  });
+  return [...encontrados.values()];
 }
 
-function configurarBuscaMultiCampoDespesas(paginador, carregarPagina, criarCartao) {
-  let temporizador;
-  document.getElementById("campo-busca").addEventListener("input", (evento) => {
-    clearTimeout(temporizador);
-    temporizador = setTimeout(async () => {
-      const termo = normalizarTexto(evento.target.value);
-      const lista = document.getElementById("lista-registros");
-      lista.innerHTML = "";
-      if (!termo) {
-        paginador.reiniciar();
-        carregarPagina(true);
-        return;
-      }
+/**
+ * Busca despesas por empenho, ordem de pagamento, credor, elemento de
+ * despesa e objeto. Devolve um array, pra poder ser combinada com
+ * outros filtros (ano, sem/com anexo) em cima do resultado.
+ */
+async function buscarDespesasMultiCampoArray(termoOriginal) {
+  const termo = normalizarTexto(termoOriginal);
+  if (!termo) return [];
 
-      const campos = ["numeroEmpenhoNormalizado", "ordemPagamentoNormalizado", "credorNomeNormalizado", "objetoNormalizado"];
-      try {
-        const resultadosPorConsulta = await Promise.all(
-          campos.map((campo) =>
-            colecaoEntidade("processosDespesa")
-              .orderBy(campo)
-              .startAt(termo)
-              .endAt(termo + "\uf8ff")
-              .limit(TAMANHO_PAGINA)
-              .get()
-          )
-        );
+  const camposNormalizados = ["numeroEmpenhoNormalizado", "ordemPagamentoNormalizado", "credorNomeNormalizado", "objetoNormalizado"];
+  const consultas = camposNormalizados.map((campo) =>
+    colecaoEntidade("processosDespesa")
+      .orderBy(campo)
+      .startAt(termo)
+      .endAt(termo + "\uf8ff")
+      .limit(TAMANHO_PAGINA)
+      .get()
+  );
+  // Elemento de despesa não precisa de campo normalizado à parte —
+  // é sempre digitado só com números e pontos, então busca direto.
+  consultas.push(
+    colecaoEntidade("processosDespesa")
+      .orderBy("elementoDespesa")
+      .startAt(termoOriginal.trim())
+      .endAt(termoOriginal.trim() + "\uf8ff")
+      .limit(TAMANHO_PAGINA)
+      .get()
+  );
 
-        const encontrados = new Map();
-        resultadosPorConsulta.forEach((snapshot) => {
-          snapshot.docs.forEach((doc) => {
-            if (!encontrados.has(doc.id)) {
-              encontrados.set(doc.id, { id: doc.id, ...doc.data() });
-            }
-          });
-        });
-
-        encontrados.forEach((registro) => lista.appendChild(criarCartao(registro)));
-        if (encontrados.size === 0) {
-          lista.innerHTML = `<p class="texto-secundario">Nenhum resultado encontrado.</p>`;
-        }
-        document.getElementById("btn-carregar-mais").classList.add("oculto");
-      } catch (erro) {
-        tratarErroConsultaFirestore(erro);
-      }
-    }, 300);
+  const resultadosPorConsulta = await Promise.all(consultas);
+  const encontrados = new Map();
+  resultadosPorConsulta.forEach((snapshot) => {
+    snapshot.docs.forEach((doc) => {
+      if (!encontrados.has(doc.id)) encontrados.set(doc.id, { id: doc.id, ...doc.data() });
+    });
   });
+  return [...encontrados.values()];
 }
 
 async function buscarRegistrosPorNome(nomeColecao, termo) {

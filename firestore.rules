@@ -40,6 +40,15 @@ service cloud.firestore {
       allow update: if podeEditar() && temAcessoEntidade(entidadeId);
       allow create, delete: if ehAdministrador();
 
+      // Subcoleção "config" guarda dados sensíveis (ex: refresh token do
+      // Drive) — só administrador pode ler ou escrever, mesmo que outros
+      // usuários tenham acesso normal à unidade gestora. Como essa regra
+      // é mais específica que a wildcard "{colecao}" logo abaixo, ela
+      // tem prioridade sobre ela para esse caminho.
+      match /config/{documentoId} {
+        allow read, write: if ehAdministrador();
+      }
+
       // ---------- SUBCOLEÇÕES DE CADA UNIDADE GESTORA ----------
       match /{colecao}/{documentoId} {
         allow read: if temAcessoEntidade(entidadeId);

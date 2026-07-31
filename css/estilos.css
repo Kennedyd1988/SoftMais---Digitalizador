@@ -141,7 +141,12 @@ input:focus, select:focus, textarea:focus {
 .cabecalho-pagina { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
 .cabecalho-pagina h2 { margin: 0; color: var(--azul-principal); margin-right: auto; }
 .acoes-cabecalho { display: flex; }
-.grupo-botoes-planilha { display: flex; gap: 8px; flex-wrap: wrap; }
+.grupo-botoes-planilha { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.area-progresso-planilha:empty { display: none; }
+.area-progresso-planilha { flex-basis: 100%; }
+.barra-progresso-inline { margin-top: 8px; max-width: 420px; }
+.barra-selecao .barra-progresso-inline { margin-top: 0; flex-basis: 100%; }
+.barra-selecao .texto-status-upload { color: rgba(255, 255, 255, 0.9); }
 .lista-erros-importacao {
   max-height: 220px; overflow-y: auto;
   background: #fff5f5; border: 1px solid #f0c2c2; border-radius: 6px;
@@ -153,6 +158,16 @@ input:focus, select:focus, textarea:focus {
 .barra-busca input[type="text"] { flex: 1; min-width: 200px; }
 .filtro-ano { max-width: 160px; }
 .botao-filtro-ativo { background: var(--azul-principal); color: var(--branco); }
+.badge-anexo { font-size: 14px; margin-right: 2px; }
+.linha-com-checkbox { display: flex; align-items: flex-start; flex: 1; min-width: 0; }
+.checkbox-selecao-registro { margin-right: 12px; margin-top: 3px; width: 18px; height: 18px; flex-shrink: 0; cursor: pointer; }
+.barra-selecao {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--azul-escuro); color: var(--branco);
+  border-radius: var(--raio, 10px); padding: 10px 16px; margin-bottom: 12px;
+  gap: 10px; flex-wrap: wrap;
+}
+.barra-selecao .botao-secundario { background: rgba(255,255,255,0.15); color: var(--branco); }
 
 .cartao-boas-vindas {
   background: var(--branco);
@@ -215,7 +230,9 @@ input:focus, select:focus, textarea:focus {
 .linha-anexo { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; border-radius: 6px; }
 .linha-anexo:hover { background: var(--azul-claro); }
 .nome-anexo { font-size: 14px; }
-.acoes-anexo { display: flex; gap: 2px; }
+.percentual-download-anexo { font-size: 12px; color: var(--azul-principal); font-weight: 600; min-width: 32px; text-align: right; }
+.acoes-anexo { display: flex; gap: 2px; align-items: center; }
+.lista-anexos-vinculados { margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--cinza-borda); width: 100%; }
 
 /* ---------- AUTOCOMPLETE ---------- */
 .lista-autocomplete {

@@ -2,6 +2,322 @@
 // MÓDULOS DE PROCESSOS
 // ===================================================================
 
+/** Verifica se o registro tem anexo, com fallback pra registros antigos sem o campo quantidadeAnexos */
+function temAnexo(registro) {
+  return (registro.quantidadeAnexos ?? (registro.anexos || []).length) > 0;
+}
+
+/** HTML da barra flutuante que aparece quando algum registro é selecionado pra exportação em lote (item 7) */
+function htmlBarraSelecaoExportacao() {
+  return `
+    <div id="barra-selecao-exportacao" class="barra-selecao oculto">
+      <span id="texto-selecao-exportacao"></span>
+      <div>
+        <button type="button" class="botao-secundario" id="btn-limpar-selecao">Limpar seleção</button>
+        <button type="button" class="botao-primario" id="btn-exportar-selecionados">📦 Exportar selecionados</button>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Gerencia a seleção de vários registros numa lista, pra exportar todos
+ * os PDFs anexados de uma vez, compactados num .zip (item 7).
+ */
+function criarGerenciadorSelecao(nomeArquivoZipPrefixo) {
+  const registrosSelecionados = new Map(); // id -> registro
+
+  function atualizarBarra() {
+    const barra = document.getElementById("barra-selecao-exportacao");
+    if (!barra) return;
+    const quantidade = registrosSelecionados.size;
+    barra.classList.toggle("oculto", quantidade === 0);
+    const texto = document.getElementById("texto-selecao-exportacao");
+    if (texto) texto.textContent = `${quantidade} registro(s) selecionado(s)`;
+  }
+
+  function alternarSelecao(registro, selecionado) {
+    if (selecionado) registrosSelecionados.set(registro.id, registro);
+    else registrosSelecionados.delete(registro.id);
+    atualizarBarra();
+  }
+
+  function limpar() {
+    registrosSelecionados.clear();
+    document.querySelectorAll(".checkbox-selecao-registro").forEach((c) => (c.checked = false));
+    atualizarBarra();
+  }
+
+  function ligarBotoes() {
+    document.getElementById("btn-limpar-selecao")?.addEventListener("click", limpar);
+
+    document.getElementById("btn-selecionar-todos")?.addEventListener("click", () => {
+      // Marca todos os checkboxes visíveis no momento (respeitando o
+      // filtro/busca atual e o que já foi carregado com "Carregar mais")
+      document.querySelectorAll(".checkbox-selecao-registro").forEach((checkbox) => {
+        if (!checkbox.checked) {
+          checkbox.checked = true;
+          checkbox.dispatchEvent(new Event("change"));
+        }
+      });
+    });
+
+    document.getElementById("btn-exportar-selecionados")?.addEventListener("click", async (evento) => {
+      const todosOsAnexos = [...registrosSelecionados.values()].flatMap((r) => r.anexos || []);
+      if (todosOsAnexos.length === 0) {
+        mostrarToast("Os registros selecionados não têm nenhum PDF anexado.", "info");
+        return;
+      }
+      const barra = criarBarraProgressoInline(
+        document.getElementById("barra-selecao-exportacao"),
+        "Exportando"
+      );
+      await executarComFeedback(evento.target, async () => {
+        try {
+          await exportarAnexosComoZip(
+            todosOsAnexos,
+            `${nomeArquivoZipPrefixo}-${new Date().toISOString().slice(0, 10)}.zip`,
+            (percentualGeral, feitos, total) => barra.atualizarPercentual(percentualGeral, `Exportando ${feitos}/${total}`)
+          );
+          mostrarToast("Exportação concluída.", "sucesso");
+        } catch (erro) {
+          mostrarToast(erro.message, "erro");
+        } finally {
+          barra.remover();
+        }
+      }, "Exportando...");
+    });
+  }
+
+  return { alternarSelecao, limpar, ligarBotoes };
+}
+
+/**
+ * Modal que lista os Processos de Despesa vinculados a uma Licitação
+ * (item 5), com botão pra baixar todos os PDFs desses processos de
+ * uma vez, compactados num .zip (item 6).
+ */
+/** HTML de uma linha de anexo somente-leitura (ver/baixar com percentual), reaproveitado nos modais de vínculo */
+function htmlLinhaAnexoSomenteLeitura(anexo) {
+  return `
+    <div class="linha-anexo-wrapper">
+      <div class="linha-anexo">
+        <span class="nome-anexo">📄 ${anexo.nomeArquivo} <span class="texto-secundario">(${anexo.paginas} pág. · ${formatarTamanhoArquivo(anexo.tamanhoBytes)})</span></span>
+        <div class="acoes-anexo">
+          <button type="button" class="botao-icone" title="Visualizar" data-acao="ver-anexo" data-id="${anexo.driveFileId}" data-nome="${anexo.nomeArquivo}">👁️</button>
+          <button type="button" class="botao-icone" title="Baixar" data-acao="baixar-anexo" data-id="${anexo.driveFileId}" data-nome="${anexo.nomeArquivo}">⬇️</button>
+        </div>
+      </div>
+      <div class="barra-progresso-container oculto" data-barra="${anexo.driveFileId}">
+        <div class="barra-progresso-preenchimento" style="width:0%"></div>
+      </div>
+    </div>
+  `;
+}
+
+/** Liga os botões ver/baixar de todas as linhas de anexo somente-leitura dentro de um container */
+function ligarAcoesAnexoSomenteLeitura(container) {
+  container.querySelectorAll('[data-acao="ver-anexo"]').forEach((botao) => {
+    botao.addEventListener("click", async (evento) => {
+      const alvo = evento.currentTarget;
+      const containerBarra = container.querySelector(`[data-barra="${alvo.dataset.id}"]`);
+      const preenchimento = containerBarra.querySelector(".barra-progresso-preenchimento");
+      alvo.disabled = true;
+      try {
+        await visualizarAnexo(alvo.dataset.id, (percentual) => {
+          containerBarra.classList.remove("oculto");
+          preenchimento.style.width = `${percentual}%`;
+        });
+      } catch (erro) {
+        mostrarToast(erro.message, "erro");
+      } finally {
+        alvo.disabled = false;
+        containerBarra.classList.add("oculto");
+        preenchimento.style.width = "0%";
+      }
+    });
+  });
+  container.querySelectorAll('[data-acao="baixar-anexo"]').forEach((botao) => {
+    botao.addEventListener("click", async (evento) => {
+      const alvo = evento.currentTarget;
+      const containerBarra = container.querySelector(`[data-barra="${alvo.dataset.id}"]`);
+      const preenchimento = containerBarra.querySelector(".barra-progresso-preenchimento");
+      alvo.disabled = true;
+      try {
+        await baixarAnexo(alvo.dataset.id, alvo.dataset.nome, (percentual) => {
+          containerBarra.classList.remove("oculto");
+          preenchimento.style.width = `${percentual}%`;
+        });
+      } catch (erro) {
+        mostrarToast(erro.message, "erro");
+      } finally {
+        alvo.disabled = false;
+        containerBarra.classList.add("oculto");
+        preenchimento.style.width = "0%";
+      }
+    });
+  });
+}
+
+/**
+ * Modal "de espiada" que mostra os dados da Licitação vinculada a uma
+ * Despesa, sem sair da tela da Despesa — ao fechar, continua exatamente
+ * onde estava. Só navega de verdade se clicar em "Editar Licitação
+ * completa", que é uma ação explícita.
+ */
+async function abrirModalResumoLicitacaoVinculada(licitacaoId, botaoOrigem) {
+  let licitacao = null;
+  try {
+    const carregar = async () => {
+      const doc = await colecaoEntidade("licitacoes").doc(licitacaoId).get();
+      if (doc.exists) licitacao = { id: doc.id, ...doc.data() };
+    };
+    if (botaoOrigem) {
+      await executarComFeedback(botaoOrigem, carregar, "Carregando...");
+    } else {
+      await carregar();
+    }
+  } catch (erro) {
+    tratarErroConsultaFirestore(erro);
+    return;
+  }
+  if (!licitacao) {
+    mostrarToast("Não foi possível encontrar a licitação vinculada.", "erro");
+    return;
+  }
+
+  const modal = document.createElement("div");
+  modal.className = "fundo-modal";
+  modal.innerHTML = `
+    <div class="caixa-modal">
+      <div class="cabecalho-modal">
+        <h3>Licitação vinculada — ${licitacao.numero}/${licitacao.ano}</h3>
+        <button class="botao-fechar-modal" id="btn-fechar-resumo-licitacao">✕</button>
+      </div>
+      <div class="corpo-modal">
+        <p><strong>Modalidade:</strong> ${licitacao.modalidadeNome || "Não informada"}</p>
+        <p class="texto-secundario">${licitacao.objeto}</p>
+        <div class="lista-anexos-vinculados" style="border-top:none; padding-top:0; margin-top:12px">
+          ${
+            (licitacao.anexos || []).length === 0
+              ? `<p class="texto-secundario">Sem anexo.</p>`
+              : licitacao.anexos.map(htmlLinhaAnexoSomenteLeitura).join("")
+          }
+        </div>
+      </div>
+      <div class="rodape-modal">
+        <button class="botao-secundario" id="btn-editar-licitacao-completa">✏️ Editar Licitação completa</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  modal.querySelector("#btn-fechar-resumo-licitacao").addEventListener("click", () => modal.remove());
+  ligarAcoesAnexoSomenteLeitura(modal);
+
+  modal.querySelector("#btn-editar-licitacao-completa").addEventListener("click", () => {
+    modal.remove();
+    fecharModal(); // aqui sim fecha a despesa, porque é uma escolha explícita de ir editar a licitação
+    navegarParaRegistro("licitacoes", licitacaoId);
+  });
+}
+
+async function abrirModalDespesasVinculadas(licitacao, botaoOrigem) {
+  let despesas = [];
+  try {
+    const carregar = async () => {
+      const snapshot = await colecaoEntidade("processosDespesa")
+        .where("licitacaoId", "==", licitacao.id)
+        .orderBy("criadoEm", "desc")
+        .get();
+      despesas = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    };
+    if (botaoOrigem) {
+      await executarComFeedback(botaoOrigem, carregar, "Carregando...");
+    } else {
+      await carregar();
+    }
+  } catch (erro) {
+    tratarErroConsultaFirestore(erro);
+    return;
+  }
+  const totalAnexos = despesas.reduce((soma, d) => soma + (d.anexos || []).length, 0);
+
+  const modal = document.createElement("div");
+  modal.className = "fundo-modal";
+  modal.innerHTML = `
+    <div class="caixa-modal">
+      <div class="cabecalho-modal">
+        <h3>Despesas vinculadas — ${licitacao.numero}/${licitacao.ano}</h3>
+        <button class="botao-fechar-modal" id="btn-fechar-vinculados">✕</button>
+      </div>
+      <div class="corpo-modal">
+        <p class="texto-secundario">${despesas.length} processo(s) de despesa vinculado(s), ${totalAnexos} anexo(s) ao todo.</p>
+        <button type="button" class="botao-secundario" id="btn-exportar-zip-vinculados" ${totalAnexos === 0 ? "disabled" : ""}>
+          📦 Exportar todos os PDFs (.zip)
+        </button>
+        <div id="area-progresso-export-zip"></div>
+        <div class="lista-despesas-vinculadas" style="margin-top:14px">
+          ${
+            despesas.length === 0
+              ? `<p class="texto-secundario">Nenhum processo de despesa vinculado ainda.</p>`
+              : despesas.map((d) => `
+                  <div class="cartao-registro linha-despesa-vinculada" data-id="${d.id}" style="flex-direction:column; align-items:stretch;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; width:100%">
+                      <div>
+                        <strong>Empenho ${d.numeroEmpenho}</strong> — ${d.credorNome || ""}
+                        <div class="texto-secundario">${formatarMoeda(d.valor)}</div>
+                      </div>
+                      <button type="button" class="botao-secundario" data-acao="abrir-processo" title="Abrir o processo completo">✏️ Editar processo completo</button>
+                    </div>
+                    <div class="lista-anexos-vinculados">
+                      ${
+                        (d.anexos || []).length === 0
+                          ? `<p class="texto-secundario" style="margin:6px 0 0">Sem anexo.</p>`
+                          : (d.anexos || []).map(htmlLinhaAnexoSomenteLeitura).join("")
+                      }
+                    </div>
+                  </div>
+                `).join("")
+          }
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  modal.querySelector("#btn-fechar-vinculados").addEventListener("click", () => modal.remove());
+  ligarAcoesAnexoSomenteLeitura(modal);
+
+  modal.querySelectorAll('[data-acao="abrir-processo"]').forEach((botao) => {
+    botao.addEventListener("click", () => {
+      const idDespesa = botao.closest(".linha-despesa-vinculada").dataset.id;
+      modal.remove();
+      fecharModal(); // aqui sim fecha a licitação, porque é uma escolha explícita de ir editar a despesa
+      navegarParaRegistro("despesas", idDespesa);
+    });
+  });
+
+  modal.querySelector("#btn-exportar-zip-vinculados")?.addEventListener("click", async (evento) => {
+    const todosOsAnexos = despesas.flatMap((d) => d.anexos || []);
+    const barra = criarBarraProgressoInline(modal.querySelector("#area-progresso-export-zip"), "Exportando");
+    await executarComFeedback(evento.target, async () => {
+      try {
+        await exportarAnexosComoZip(
+          todosOsAnexos,
+          `despesas-licitacao-${licitacao.numero}-${licitacao.ano}.zip`,
+          (percentualGeral, feitos, total) => barra.atualizarPercentual(percentualGeral, `Exportando ${feitos}/${total}`)
+        );
+        mostrarToast("Exportação concluída.", "sucesso");
+      } catch (erro) {
+        mostrarToast(erro.message, "erro");
+      } finally {
+        barra.remover();
+      }
+    }, "Exportando...");
+  });
+}
+
 /** Gera as opções de um <select> de anos, do mais recente pro mais antigo */
 function gerarOpcoesAno(anoSelecionado) {
   const anoAtual = new Date().getFullYear();
@@ -13,31 +329,45 @@ function gerarOpcoesAno(anoSelecionado) {
 }
 
 /**
- * Liga o botão "Sem anexo" a uma consulta que filtra só os registros com
- * quantidadeAnexos == 0. Reaproveitado pelos 4 módulos com anexo.
+ * Liga os botões "Sem anexo" e "Com anexo" a consultas que filtram por
+ * quantidadeAnexos. Só um dos dois fica ativo por vez (clicar de novo
+ * desativa). Reaproveitado pelos 4 módulos com anexo.
  */
-function configurarFiltroSemAnexo(nomeColecao, definirPaginador, carregarPagina) {
-  const botao = document.getElementById("btn-filtro-sem-anexo");
-  let ativo = false;
+function configurarFiltrosAnexo(nomeColecao, definirPaginador, carregarPagina) {
+  const botaoSem = document.getElementById("btn-filtro-sem-anexo");
+  const botaoCom = document.getElementById("btn-filtro-com-anexo");
+  let filtroAtivo = null; // 'sem' | 'com' | null
 
-  botao.addEventListener("click", () => {
-    ativo = !ativo;
-    botao.classList.toggle("botao-filtro-ativo", ativo);
+  function aplicar(novoFiltro) {
+    filtroAtivo = filtroAtivo === novoFiltro ? null : novoFiltro;
+    botaoSem.classList.toggle("botao-filtro-ativo", filtroAtivo === "sem");
+    botaoCom.classList.toggle("botao-filtro-ativo", filtroAtivo === "com");
     document.getElementById("campo-busca").value = "";
     const seletorAno = document.getElementById("filtro-ano");
     if (seletorAno) seletorAno.value = "";
 
-    const consulta = ativo
-      ? colecaoEntidade(nomeColecao).where("quantidadeAnexos", "==", 0).orderBy("criadoEm", "desc")
-      : colecaoEntidade(nomeColecao).orderBy("criadoEm", "desc");
+    let consulta;
+    if (filtroAtivo === "sem") {
+      consulta = colecaoEntidade(nomeColecao).where("quantidadeAnexos", "==", 0).orderBy("criadoEm", "desc");
+    } else if (filtroAtivo === "com") {
+      // Filtro de desigualdade (>0) exige que o orderBy comece pelo
+      // mesmo campo — por isso ordena por quantidadeAnexos, não por data.
+      consulta = colecaoEntidade(nomeColecao).where("quantidadeAnexos", ">", 0).orderBy("quantidadeAnexos", "desc");
+    } else {
+      consulta = colecaoEntidade(nomeColecao).orderBy("criadoEm", "desc");
+    }
     definirPaginador(criarPaginador(consulta));
     carregarPagina(true);
-  });
+  }
+
+  botaoSem.addEventListener("click", () => aplicar("sem"));
+  botaoCom.addEventListener("click", () => aplicar("com"));
 
   return {
     desativar() {
-      ativo = false;
-      botao.classList.remove("botao-filtro-ativo");
+      filtroAtivo = null;
+      botaoSem.classList.remove("botao-filtro-ativo");
+      botaoCom.classList.remove("botao-filtro-ativo");
     },
   };
 }
@@ -68,12 +398,17 @@ async function renderizarLicitacoes(area) {
       <input type="text" id="campo-busca" placeholder="Buscar por número, ano ou objeto...">
       <select id="filtro-ano" class="filtro-ano">${gerarOpcoesAno()}</select>
       <button type="button" class="botao-secundario" id="btn-filtro-sem-anexo">📋 Sem anexo</button>
+      <button type="button" class="botao-secundario" id="btn-filtro-com-anexo">📎 Com anexo</button>
+      <button type="button" class="botao-secundario" id="btn-selecionar-todos">☑️ Selecionar todos</button>
     </div>
+    ${htmlBarraSelecaoExportacao()}
     <div id="lista-registros" class="lista-cartoes"></div>
     <button id="btn-carregar-mais" class="botao-secundario oculto">Carregar mais</button>
   `;
 
   let paginador = criarPaginador(colecaoEntidade("licitacoes").orderBy("criadoEm", "desc"));
+  const gerenciadorSelecao = criarGerenciadorSelecao("licitacoes");
+  gerenciadorSelecao.ligarBotoes();
   const modalidades = await carregarOpcoesSelect("modalidadesLicitacao");
   const mapaModalidades = Object.fromEntries(modalidades.map((m) => [m.id, m.nome]));
   const mapaModalidadePorNome = Object.fromEntries(modalidades.map((m) => [normalizarTexto(m.nome), m.id]));
@@ -100,7 +435,13 @@ async function renderizarLicitacoes(area) {
         const modalidadeId = mapaModalidadePorNome[normalizarTexto(nomeModalidade)];
         if (!modalidadeId) throw new Error(`Modalidade "${nomeModalidade}" não encontrada. Cadastre-a antes de importar.`);
         return {
-          numero, ano, modalidadeId, objeto,
+          numero,
+          numeroNormalizado: normalizarTexto(numero),
+          ano,
+          modalidadeId,
+          modalidadeNome: nomeModalidade,
+          modalidadeNomeNormalizado: normalizarTexto(nomeModalidade),
+          objeto,
           objetoNormalizado: normalizarTexto(objeto),
           anexos: [],
           quantidadeAnexos: 0,
@@ -137,20 +478,28 @@ async function renderizarLicitacoes(area) {
     const cartao = document.createElement("div");
     cartao.className = "cartao-registro";
     cartao.innerHTML = `
-      <div>
-        <strong>${registro.numero}/${registro.ano}</strong> — ${mapaModalidades[registro.modalidadeId] || "Modalidade não informada"}
-        <div class="texto-secundario">${registro.objeto}</div>
-        <div class="texto-secundario">${(registro.anexos || []).length} anexo(s)</div>
+      <div class="linha-com-checkbox">
+        <input type="checkbox" class="checkbox-selecao-registro" title="Selecionar pra exportação em lote">
+        <div>
+          <strong>${registro.numero}/${registro.ano}</strong> — ${mapaModalidades[registro.modalidadeId] || "Modalidade não informada"}
+          <div class="texto-secundario">${registro.objeto}</div>
+          <div class="texto-secundario">${(registro.anexos || []).length} anexo(s)</div>
+        </div>
       </div>
       ${
         usuarioPodeEditar()
           ? `<div class="acoes-cartao">
+               ${temAnexo(registro) ? `<span class="badge-anexo" title="Tem anexo">📎</span>` : ""}
                <button class="botao-icone" data-acao="editar">✏️</button>
                <button class="botao-icone" data-acao="excluir">🗑️</button>
              </div>`
           : ""
       }
     `;
+    cartao.querySelector(".checkbox-selecao-registro").addEventListener("click", (evento) => evento.stopPropagation());
+    cartao.querySelector(".checkbox-selecao-registro").addEventListener("change", (evento) =>
+      gerenciadorSelecao.alternarSelecao(registro, evento.target.checked)
+    );
     cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", () => abrirFormulario(registro));
     cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) =>
       excluirLicitacao(registro, evento.target)
@@ -181,6 +530,11 @@ async function renderizarLicitacoes(area) {
       </select>
       <label>Objeto *</label>
       <textarea id="campo-objeto" rows="3">${registro?.objeto || ""}</textarea>
+      ${
+        registro
+          ? `<button type="button" class="botao-secundario botao-link-vinculado" id="btn-ver-despesas-vinculadas">🔗 Ver Despesas Vinculadas</button>`
+          : ""
+      }
       <div id="secao-anexos"></div>
     `, async (botaoSalvar) => {
       const campoNumero = document.getElementById("campo-numero");
@@ -197,8 +551,11 @@ async function renderizarLicitacoes(area) {
       await executarComFeedback(botaoSalvar, async () => {
         const dados = {
           numero: campoNumero.value.trim(),
+          numeroNormalizado: normalizarTexto(campoNumero.value),
           ano: parseInt(document.getElementById("campo-ano").value, 10),
           modalidadeId: campoModalidade.value,
+          modalidadeNome: mapaModalidades[campoModalidade.value] || "",
+          modalidadeNomeNormalizado: normalizarTexto(mapaModalidades[campoModalidade.value] || ""),
           objeto: campoObjeto.value.trim(),
           objetoNormalizado: normalizarTexto(campoObjeto.value),
           anexos: controleAnexos.obterAnexos(),
@@ -233,6 +590,10 @@ async function renderizarLicitacoes(area) {
           : "";
       }
     );
+
+    modal.querySelector("#btn-ver-despesas-vinculadas")?.addEventListener("click", (evento) => {
+      abrirModalDespesasVinculadas(registro, evento.target);
+    });
   }
 
   async function excluirLicitacao(registro, botaoExcluir) {
@@ -260,9 +621,9 @@ async function renderizarLicitacoes(area) {
 
   document.getElementById("btn-novo")?.addEventListener("click", () => abrirFormulario());
   document.getElementById("btn-carregar-mais").addEventListener("click", () => carregarPagina(false));
-  configurarBuscaGenerica("licitacoes", criarCartao, paginador, carregarPagina);
+  configurarBuscaMultiCampoLicitacoes(paginador, carregarPagina, criarCartao);
 
-  const filtroSemAnexo = configurarFiltroSemAnexo(
+  const filtrosAnexo = configurarFiltrosAnexo(
     "licitacoes",
     (novoPaginador) => { paginador = novoPaginador; },
     carregarPagina
@@ -270,7 +631,7 @@ async function renderizarLicitacoes(area) {
 
   document.getElementById("filtro-ano").addEventListener("change", (evento) => {
     document.getElementById("campo-busca").value = "";
-    filtroSemAnexo.desativar();
+    filtrosAnexo.desativar();
     const ano = evento.target.value;
     const consulta = ano
       ? colecaoEntidade("licitacoes").where("ano", "==", parseInt(ano, 10)).orderBy("criadoEm", "desc")
@@ -280,6 +641,13 @@ async function renderizarLicitacoes(area) {
   });
 
   carregarPagina(true);
+
+  if (registroPendenteParaAbrir?.chave === "licitacoes") {
+    const idPendente = registroPendenteParaAbrir.id;
+    registroPendenteParaAbrir = null;
+    const doc = await colecaoEntidade("licitacoes").doc(idPendente).get();
+    if (doc.exists) abrirFormulario({ id: doc.id, ...doc.data() });
+  }
 }
 
 // -------------------------------------------------------------
@@ -296,12 +664,17 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
       <input type="text" id="campo-busca" placeholder="Buscar por número ou objeto...">
       <select id="filtro-ano" class="filtro-ano">${gerarOpcoesAno()}</select>
       <button type="button" class="botao-secundario" id="btn-filtro-sem-anexo">📋 Sem anexo</button>
+      <button type="button" class="botao-secundario" id="btn-filtro-com-anexo">📎 Com anexo</button>
+      <button type="button" class="botao-secundario" id="btn-selecionar-todos">☑️ Selecionar todos</button>
     </div>
+    ${htmlBarraSelecaoExportacao()}
     <div id="lista-registros" class="lista-cartoes"></div>
     <button id="btn-carregar-mais" class="botao-secundario oculto">Carregar mais</button>
   `;
 
   let paginador = criarPaginador(colecaoEntidade(nomeColecao).orderBy("criadoEm", "desc"));
+  const gerenciadorSelecao = criarGerenciadorSelecao(nomeColecao);
+  gerenciadorSelecao.ligarBotoes();
   const tipos = await carregarOpcoesSelect("tiposDocumento");
   const mapaTipos = Object.fromEntries(tipos.map((t) => [t.id, t.nome]));
   const mapaTipoPorNome = Object.fromEntries(tipos.map((t) => [normalizarTexto(t.nome), t.id]));
@@ -365,20 +738,28 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
     const cartao = document.createElement("div");
     cartao.className = "cartao-registro";
     cartao.innerHTML = `
-      <div>
-        <strong>${mapaTipos[registro.tipoId] || "Tipo não informado"} nº ${registro.numero}${registro.ano ? "/" + registro.ano : ""}</strong>
-        <div class="texto-secundario">${registro.objeto}</div>
-        <div class="texto-secundario">${(registro.anexos || []).length} anexo(s)</div>
+      <div class="linha-com-checkbox">
+        <input type="checkbox" class="checkbox-selecao-registro" title="Selecionar pra exportação em lote">
+        <div>
+          <strong>${mapaTipos[registro.tipoId] || "Tipo não informado"} nº ${registro.numero}${registro.ano ? "/" + registro.ano : ""}</strong>
+          <div class="texto-secundario">${registro.objeto}</div>
+          <div class="texto-secundario">${(registro.anexos || []).length} anexo(s)</div>
+        </div>
       </div>
       ${
         usuarioPodeEditar()
           ? `<div class="acoes-cartao">
+               ${temAnexo(registro) ? `<span class="badge-anexo" title="Tem anexo">📎</span>` : ""}
                <button class="botao-icone" data-acao="editar">✏️</button>
                <button class="botao-icone" data-acao="excluir">🗑️</button>
              </div>`
           : ""
       }
     `;
+    cartao.querySelector(".checkbox-selecao-registro").addEventListener("click", (evento) => evento.stopPropagation());
+    cartao.querySelector(".checkbox-selecao-registro").addEventListener("change", (evento) =>
+      gerenciadorSelecao.alternarSelecao(registro, evento.target.checked)
+    );
     cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", () => abrirFormulario(registro));
     cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) =>
       excluirRegistroModulo(registro, evento.target)
@@ -474,7 +855,7 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
   document.getElementById("btn-carregar-mais").addEventListener("click", () => carregarPagina(false));
   configurarBuscaGenerica(nomeColecao, criarCartao, paginador, carregarPagina, "objetoNormalizado");
 
-  const filtroSemAnexo = configurarFiltroSemAnexo(
+  const filtrosAnexo = configurarFiltrosAnexo(
     nomeColecao,
     (novoPaginador) => { paginador = novoPaginador; },
     carregarPagina
@@ -482,7 +863,7 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
 
   document.getElementById("filtro-ano").addEventListener("change", (evento) => {
     document.getElementById("campo-busca").value = "";
-    filtroSemAnexo.desativar();
+    filtrosAnexo.desativar();
     const ano = evento.target.value;
     const consulta = ano
       ? colecaoEntidade(nomeColecao).where("ano", "==", parseInt(ano, 10)).orderBy("criadoEm", "desc")
@@ -515,12 +896,17 @@ async function renderizarDespesas(area) {
       <input type="text" id="campo-busca" placeholder="Buscar por empenho, ordem de pagamento, credor ou objeto...">
       <select id="filtro-ano" class="filtro-ano">${gerarOpcoesAno()}</select>
       <button type="button" class="botao-secundario" id="btn-filtro-sem-anexo">📋 Sem anexo</button>
+      <button type="button" class="botao-secundario" id="btn-filtro-com-anexo">📎 Com anexo</button>
+      <button type="button" class="botao-secundario" id="btn-selecionar-todos">☑️ Selecionar todos</button>
     </div>
+    ${htmlBarraSelecaoExportacao()}
     <div id="lista-registros" class="lista-cartoes"></div>
     <button id="btn-carregar-mais" class="botao-secundario oculto">Carregar mais</button>
   `;
 
   let paginador = criarPaginador(colecaoEntidade("processosDespesa").orderBy("criadoEm", "desc"));
+  const gerenciadorSelecao = criarGerenciadorSelecao("despesas");
+  gerenciadorSelecao.ligarBotoes();
   const [unidadesOrc, fontesRecurso] = await Promise.all([
     carregarOpcoesSelect("unidadesOrcamentarias"),
     carregarOpcoesSelect("fontesRecurso"),
@@ -684,22 +1070,30 @@ async function renderizarDespesas(area) {
     const cartao = document.createElement("div");
     cartao.className = "cartao-registro";
     cartao.innerHTML = `
-      <div>
-        <strong>Empenho ${registro.numeroEmpenho}</strong> — ${registro.credorNome || ""}
-        <div class="texto-secundario">${registro.objeto}</div>
-        <div class="texto-secundario">${formatarMoeda(registro.valor)} · Pagamento em ${formatarData(registro.dataPagamento)}</div>
-        <div class="texto-secundario">Ordem de Pagamento: ${registro.ordemPagamento || "-"} · Elemento: <span class="num">${registro.elementoDespesa || "-"}</span></div>
-        <div class="texto-secundario">${(registro.anexos || []).length} anexo(s)</div>
+      <div class="linha-com-checkbox">
+        <input type="checkbox" class="checkbox-selecao-registro" title="Selecionar pra exportação em lote">
+        <div>
+          <strong>Empenho ${registro.numeroEmpenho}</strong> — ${registro.credorNome || ""}
+          <div class="texto-secundario">${registro.objeto}</div>
+          <div class="texto-secundario">${formatarMoeda(registro.valor)} · Pagamento em ${formatarData(registro.dataPagamento)}</div>
+          <div class="texto-secundario">Ordem de Pagamento: ${registro.ordemPagamento || "-"} · Elemento: <span class="num">${registro.elementoDespesa || "-"}</span></div>
+          <div class="texto-secundario">${(registro.anexos || []).length} anexo(s)</div>
+        </div>
       </div>
       ${
         usuarioPodeEditar()
           ? `<div class="acoes-cartao">
+               ${temAnexo(registro) ? `<span class="badge-anexo" title="Tem anexo">📎</span>` : ""}
                <button class="botao-icone" data-acao="editar">✏️</button>
                <button class="botao-icone" data-acao="excluir">🗑️</button>
              </div>`
           : ""
       }
     `;
+    cartao.querySelector(".checkbox-selecao-registro").addEventListener("click", (evento) => evento.stopPropagation());
+    cartao.querySelector(".checkbox-selecao-registro").addEventListener("change", (evento) =>
+      gerenciadorSelecao.alternarSelecao(registro, evento.target.checked)
+    );
     cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", () => abrirFormulario(registro));
     cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) =>
       excluirDespesa(registro, evento.target)
@@ -749,10 +1143,19 @@ async function renderizarDespesas(area) {
         </div>
       </div>
 
-      <label>Licitação de origem (opcional)</label>
-      <input type="text" id="campo-licitacao-busca" placeholder="Digite número/ano para vincular..." value="${registro?.licitacaoIdentificador || ""}" autocomplete="off">
+      <label>Licitação de origem *</label>
+      <input type="text" id="campo-licitacao-busca" placeholder="Digite número/ano para vincular..." value="${registro?.licitacaoIdentificador || ""}" autocomplete="off" ${registro?.semLicitacaoVinculada ? "disabled" : ""}>
       <input type="hidden" id="campo-licitacao-id" value="${registro?.licitacaoId || ""}">
       <div id="resultados-licitacao" class="lista-autocomplete oculto"></div>
+      <label class="item-checkbox" style="margin-top:8px">
+        <input type="checkbox" id="campo-sem-licitacao" ${registro?.semLicitacaoVinculada ? "checked" : ""}>
+        Processo sem licitação vinculada
+      </label>
+      ${
+        registro?.licitacaoId
+          ? `<button type="button" class="botao-secundario botao-link-vinculado" id="btn-ver-licitacao-vinculada">🔗 Ver Licitação vinculada</button>`
+          : ""
+      }
 
       <label>Objeto *</label>
       <textarea id="campo-objeto" rows="3">${registro?.objeto || ""}</textarea>
@@ -779,9 +1182,12 @@ async function renderizarDespesas(area) {
       const campoObjeto = document.getElementById("campo-objeto");
       const campoDataPagamento = document.getElementById("campo-data-pagamento");
       const campoValor = document.getElementById("campo-valor");
+      const campoLicitacaoId = document.getElementById("campo-licitacao-id");
+      const campoSemLicitacao = document.getElementById("campo-sem-licitacao");
 
       [campoNumeroEmpenho, campoOrdemPagamento, campoElementoDespesa, campoUnidadeOrc, campoFonteRecurso, campoObjeto, campoDataPagamento, campoValor]
         .forEach(limparCampoInvalido);
+      limparCampoInvalido(document.getElementById("campo-licitacao-busca"));
 
       let valido = true;
       if (!campoNumeroEmpenho.value.trim()) { marcarCampoInvalido(campoNumeroEmpenho, "Informe o número do empenho."); valido = false; }
@@ -792,6 +1198,10 @@ async function renderizarDespesas(area) {
         valido = false;
       } else if (!padraoElementoDespesa.test(campoElementoDespesa.value.trim())) {
         marcarCampoInvalido(campoElementoDespesa, "Formato esperado: 9.9.99.99.99 (ex: 3.3.90.30.00).");
+        valido = false;
+      }
+      if (!campoSemLicitacao.checked && !campoLicitacaoId.value) {
+        marcarCampoInvalido(document.getElementById("campo-licitacao-busca"), 'Vincule uma licitação, ou marque "Processo sem licitação vinculada".');
         valido = false;
       }
       if (!campoCredorId.value) { marcarCampoInvalido(document.getElementById("campo-credor-busca"), "Selecione um credor da lista."); valido = false; }
@@ -814,8 +1224,9 @@ async function renderizarDespesas(area) {
           credorNomeNormalizado: normalizarTexto(document.getElementById("campo-credor-busca").value),
           unidadeOrcamentariaId: campoUnidadeOrc.value,
           fonteRecursoId: campoFonteRecurso.value,
-          licitacaoId: document.getElementById("campo-licitacao-id").value || null,
-          licitacaoIdentificador: document.getElementById("campo-licitacao-busca").value.trim() || null,
+          licitacaoId: campoSemLicitacao.checked ? null : (document.getElementById("campo-licitacao-id").value || null),
+          licitacaoIdentificador: campoSemLicitacao.checked ? null : (document.getElementById("campo-licitacao-busca").value.trim() || null),
+          semLicitacaoVinculada: campoSemLicitacao.checked,
           objeto: campoObjeto.value.trim(),
           objetoNormalizado: normalizarTexto(campoObjeto.value),
           dataPagamento: campoDataPagamento.value,
@@ -863,7 +1274,21 @@ async function renderizarDespesas(area) {
       inputId: modal.querySelector("#campo-licitacao-id"),
       resultadosEl: modal.querySelector("#resultados-licitacao"),
       buscar: (termo) => buscarLicitacoesPorTermo(termo),
-      rotulo: (item) => `${item.numero}/${item.ano} — ${item.objeto}`.slice(0, 80),
+      rotulo: (item) => `${item.numero}/${item.ano} — ${item.modalidadeNome || "Modalidade não informada"} — ${item.objeto}`.slice(0, 90),
+    });
+
+    modal.querySelector("#btn-ver-licitacao-vinculada")?.addEventListener("click", (evento) => {
+      abrirModalResumoLicitacaoVinculada(registro.licitacaoId, evento.target);
+    });
+
+    modal.querySelector("#campo-sem-licitacao").addEventListener("change", (evento) => {
+      const campoBusca = modal.querySelector("#campo-licitacao-busca");
+      campoBusca.disabled = evento.target.checked;
+      if (evento.target.checked) {
+        campoBusca.value = "";
+        modal.querySelector("#campo-licitacao-id").value = "";
+        limparCampoInvalido(campoBusca);
+      }
     });
   }
 
@@ -885,7 +1310,7 @@ async function renderizarDespesas(area) {
   document.getElementById("btn-carregar-mais").addEventListener("click", () => carregarPagina(false));
   configurarBuscaMultiCampoDespesas(paginador, carregarPagina, criarCartao);
 
-  const filtroSemAnexo = configurarFiltroSemAnexo(
+  const filtrosAnexo = configurarFiltrosAnexo(
     "processosDespesa",
     (novoPaginador) => { paginador = novoPaginador; },
     carregarPagina
@@ -893,7 +1318,7 @@ async function renderizarDespesas(area) {
 
   document.getElementById("filtro-ano").addEventListener("change", (evento) => {
     document.getElementById("campo-busca").value = "";
-    filtroSemAnexo.desativar();
+    filtrosAnexo.desativar();
     const ano = evento.target.value;
     const consulta = ano
       ? colecaoEntidade("processosDespesa")
@@ -906,6 +1331,13 @@ async function renderizarDespesas(area) {
   });
 
   carregarPagina(true);
+
+  if (registroPendenteParaAbrir?.chave === "despesas") {
+    const idPendente = registroPendenteParaAbrir.id;
+    registroPendenteParaAbrir = null;
+    const doc = await colecaoEntidade("processosDespesa").doc(idPendente).get();
+    if (doc.exists) abrirFormulario({ id: doc.id, ...doc.data() });
+  }
 }
 
 /**
@@ -915,6 +1347,84 @@ async function renderizarDespesas(area) {
  * num campo por vez, por isso a necessidade de 3 consultas separadas em
  * vez de uma única "busca em tudo".
  */
+/**
+ * Busca dedicada da Licitação: consulta em paralelo por prefixo em três
+ * campos (número, modalidade e objeto) e, se o termo digitado parecer
+ * um ano (4 dígitos), soma também uma busca exata por ano. Junta tudo
+ * sem duplicar.
+ */
+function configurarBuscaMultiCampoLicitacoes(paginador, carregarPagina, criarCartao) {
+  let temporizador;
+  document.getElementById("campo-busca").addEventListener("input", (evento) => {
+    clearTimeout(temporizador);
+    temporizador = setTimeout(async () => {
+      const termoOriginal = evento.target.value.trim();
+      // Aceita tanto digitar só o número ("015") quanto o formato
+      // completo "015/2026" — nesse segundo caso, número e ano precisam
+      // bater os dois ao mesmo tempo (não é "ou", é "e").
+      const [parteNumero, parteAno] = termoOriginal.split("/").map((p) => p.trim());
+      const termo = normalizarTexto(parteNumero);
+      const anoValido = /^\d{4}$/.test(parteAno || "");
+      const lista = document.getElementById("lista-registros");
+      lista.innerHTML = "";
+      if (!termo) {
+        paginador.reiniciar();
+        carregarPagina(true);
+        return;
+      }
+
+      try {
+        let encontrados = new Map();
+
+        if (anoValido) {
+          // Formato "número/ano": busca só por número (prefixo) e depois
+          // filtra pelo ano no próprio navegador — evita precisar de um
+          // índice composto no Firestore pra cruzar prefixo + igualdade.
+          const snapshot = await colecaoEntidade("licitacoes")
+            .orderBy("numeroNormalizado")
+            .startAt(termo)
+            .endAt(termo + "\uf8ff")
+            .limit(TAMANHO_PAGINA)
+            .get();
+          const anoNumero = parseInt(parteAno, 10);
+          snapshot.docs
+            .map((doc) => ({ id: doc.id, ...doc.data() }))
+            .filter((registro) => registro.ano === anoNumero)
+            .forEach((registro) => encontrados.set(registro.id, registro));
+        } else {
+          // Busca geral: número OU modalidade OU objeto batendo o termo
+          // (e, se o termo inteiro for um ano de 4 dígitos, também ano)
+          const consultas = ["numeroNormalizado", "modalidadeNomeNormalizado", "objetoNormalizado"].map((campo) =>
+            colecaoEntidade("licitacoes")
+              .orderBy(campo)
+              .startAt(termo)
+              .endAt(termo + "\uf8ff")
+              .limit(TAMANHO_PAGINA)
+              .get()
+          );
+          if (/^\d{4}$/.test(termoOriginal)) {
+            consultas.push(colecaoEntidade("licitacoes").where("ano", "==", parseInt(termoOriginal, 10)).limit(TAMANHO_PAGINA).get());
+          }
+          const resultadosPorConsulta = await Promise.all(consultas);
+          resultadosPorConsulta.forEach((snapshot) => {
+            snapshot.docs.forEach((doc) => {
+              if (!encontrados.has(doc.id)) encontrados.set(doc.id, { id: doc.id, ...doc.data() });
+            });
+          });
+        }
+
+        encontrados.forEach((registro) => lista.appendChild(criarCartao(registro)));
+        if (encontrados.size === 0) {
+          lista.innerHTML = `<p class="texto-secundario">Nenhum resultado encontrado.</p>`;
+        }
+        document.getElementById("btn-carregar-mais").classList.add("oculto");
+      } catch (erro) {
+        tratarErroConsultaFirestore(erro);
+      }
+    }, 300);
+  });
+}
+
 function configurarBuscaMultiCampoDespesas(paginador, carregarPagina, criarCartao) {
   let temporizador;
   document.getElementById("campo-busca").addEventListener("input", (evento) => {
@@ -976,13 +1486,47 @@ async function buscarRegistrosPorNome(nomeColecao, termo) {
 }
 
 async function buscarLicitacoesPorTermo(termo) {
-  const normalizado = termo.trim();
-  if (!normalizado) return [];
-  const snapshot = await colecaoEntidade("licitacoes").orderBy("numero").limit(200).get();
-  return snapshot.docs
-    .map((d) => ({ id: d.id, ...d.data() }))
-    .filter((l) => `${l.numero}/${l.ano}`.includes(normalizado))
-    .slice(0, 10);
+  const termoOriginal = termo.trim();
+  const [parteNumero, parteAno] = termoOriginal.split("/").map((p) => p.trim());
+  const termoNormalizado = normalizarTexto(parteNumero);
+  if (!termoNormalizado) return [];
+  const anoValido = /^\d{4}$/.test(parteAno || "");
+
+  if (anoValido) {
+    // Formato "número/ano": número por prefixo, filtrado por ano no navegador
+    const snapshot = await colecaoEntidade("licitacoes")
+      .orderBy("numeroNormalizado")
+      .startAt(termoNormalizado)
+      .endAt(termoNormalizado + "\uf8ff")
+      .limit(20)
+      .get();
+    const anoNumero = parseInt(parteAno, 10);
+    return snapshot.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() }))
+      .filter((registro) => registro.ano === anoNumero)
+      .slice(0, 10);
+  }
+
+  const consultas = ["numeroNormalizado", "modalidadeNomeNormalizado"].map((campo) =>
+    colecaoEntidade("licitacoes")
+      .orderBy(campo)
+      .startAt(termoNormalizado)
+      .endAt(termoNormalizado + "\uf8ff")
+      .limit(10)
+      .get()
+  );
+  if (/^\d{4}$/.test(termoOriginal)) {
+    consultas.push(colecaoEntidade("licitacoes").where("ano", "==", parseInt(termoOriginal, 10)).limit(10).get());
+  }
+
+  const resultadosPorConsulta = await Promise.all(consultas);
+  const encontrados = new Map();
+  resultadosPorConsulta.forEach((snapshot) => {
+    snapshot.docs.forEach((doc) => {
+      if (!encontrados.has(doc.id)) encontrados.set(doc.id, { id: doc.id, ...doc.data() });
+    });
+  });
+  return [...encontrados.values()].slice(0, 10);
 }
 
 /** Componente simples de busca com resultados em lista (autocomplete) */

@@ -123,27 +123,52 @@ function renderizarSecaoAnexos(container, anexosIniciais, nomeModulo, aoMudar, o
         .filter((a) => (a.volume || 1) === numeroVolume)
         .forEach((anexo) => {
           const linha = document.createElement("div");
-          linha.className = "linha-anexo";
+          linha.className = "linha-anexo-wrapper";
           linha.innerHTML = `
-            <span class="nome-anexo">📄 ${anexo.nomeArquivo} <span class="texto-secundario">(${anexo.paginas} pág. · ${formatarTamanhoArquivo(anexo.tamanhoBytes)})</span></span>
-            <div class="acoes-anexo">
-              <button type="button" class="botao-icone" title="Visualizar" data-acao="ver">👁️</button>
-              <button type="button" class="botao-icone" title="Baixar" data-acao="baixar">⬇️</button>
-              <button type="button" class="botao-icone" title="Remover" data-acao="remover">🗑️</button>
+            <div class="linha-anexo">
+              <span class="nome-anexo">📄 ${anexo.nomeArquivo} <span class="texto-secundario">(${anexo.paginas} pág. · ${formatarTamanhoArquivo(anexo.tamanhoBytes)})</span></span>
+              <div class="acoes-anexo">
+                <button type="button" class="botao-icone" title="Visualizar" data-acao="ver">👁️</button>
+                <button type="button" class="botao-icone" title="Baixar" data-acao="baixar">⬇️</button>
+                <button type="button" class="botao-icone" title="Remover" data-acao="remover">🗑️</button>
+              </div>
+            </div>
+            <div class="barra-progresso-container oculto" id="barra-${anexo.driveFileId}">
+              <div class="barra-progresso-preenchimento" style="width:0%"></div>
             </div>
           `;
-          linha.querySelector('[data-acao="ver"]').addEventListener("click", async () => {
+          const containerBarra = linha.querySelector(`#barra-${anexo.driveFileId}`);
+          const preenchimentoBarra = containerBarra.querySelector(".barra-progresso-preenchimento");
+          const atualizarBarra = (percentual) => {
+            containerBarra.classList.remove("oculto");
+            preenchimentoBarra.style.width = `${percentual}%`;
+          };
+          const esconderBarra = () => {
+            containerBarra.classList.add("oculto");
+            preenchimentoBarra.style.width = "0%";
+          };
+          linha.querySelector('[data-acao="ver"]').addEventListener("click", async (evento) => {
+            const botao = evento.currentTarget;
+            botao.disabled = true;
             try {
-              await visualizarAnexo(anexo.driveFileId);
+              await visualizarAnexo(anexo.driveFileId, atualizarBarra);
             } catch (erro) {
               mostrarToast(erro.message, "erro");
+            } finally {
+              botao.disabled = false;
+              esconderBarra();
             }
           });
-          linha.querySelector('[data-acao="baixar"]').addEventListener("click", async () => {
+          linha.querySelector('[data-acao="baixar"]').addEventListener("click", async (evento) => {
+            const botao = evento.currentTarget;
+            botao.disabled = true;
             try {
-              await baixarAnexo(anexo.driveFileId, anexo.nomeArquivo);
+              await baixarAnexo(anexo.driveFileId, anexo.nomeArquivo, atualizarBarra);
             } catch (erro) {
               mostrarToast(erro.message, "erro");
+            } finally {
+              botao.disabled = false;
+              esconderBarra();
             }
           });
           linha.querySelector('[data-acao="remover"]').addEventListener("click", async () => {

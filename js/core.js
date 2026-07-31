@@ -7,7 +7,7 @@
 // e na tela de login, para facilitar conferir se o navegador já está
 // com a versão mais recente (ajuda a identificar problema de cache).
 // ===================================================================
-const VERSAO_APP = "2.7";
+const VERSAO_APP = "4.6";
 document.addEventListener("DOMContentLoaded", () => {
   const elementoLogin = document.getElementById("versao-app-login");
   if (elementoLogin) elementoLogin.textContent = `v${VERSAO_APP}`;
@@ -80,6 +80,41 @@ function tratarErroConsultaFirestore(erro) {
   } else {
     mostrarToast("Erro ao carregar a lista. Tente novamente.", "erro");
   }
+}
+
+/**
+ * Cria uma barra de progresso visual (com percentual) dentro de um
+ * elemento — reutilizada em qualquer operação demorada e em lote
+ * (upload, exportação em zip, importação/exportação de planilha,
+ * reindexação em massa), pra nunca deixar o usuário sem saber quanto
+ * falta.
+ */
+function criarBarraProgressoInline(container, rotuloInicial = "Processando") {
+  const div = document.createElement("div");
+  div.className = "barra-progresso-inline";
+  div.innerHTML = `
+    <div class="texto-status-upload">${rotuloInicial}...</div>
+    <div class="barra-progresso-container">
+      <div class="barra-progresso-preenchimento" style="width:0%"></div>
+    </div>
+  `;
+  container.appendChild(div);
+  const textoEl = div.querySelector(".texto-status-upload");
+  const barraEl = div.querySelector(".barra-progresso-preenchimento");
+  return {
+    atualizar(feitos, total, rotulo = rotuloInicial) {
+      const percentual = total > 0 ? Math.round((feitos / total) * 100) : 0;
+      textoEl.textContent = `${rotulo}... ${feitos}/${total} (${percentual}%)`;
+      barraEl.style.width = `${percentual}%`;
+    },
+    atualizarPercentual(percentual, rotulo = rotuloInicial) {
+      textoEl.textContent = `${rotulo}... ${percentual}%`;
+      barraEl.style.width = `${percentual}%`;
+    },
+    remover() {
+      div.remove();
+    },
+  };
 }
 
 /** Botão de ação com estado "processando..." — evita tela parada sem feedback */
@@ -304,6 +339,15 @@ const ITENS_MENU = [
 ];
 
 let paginaAtual = "inicio";
+
+// Usado pelos botões de navegação cruzada (ex: "Ver Licitação vinculada"
+// dentro de uma Despesa) — guarda qual registro deve abrir
+// automaticamente assim que a aba de destino terminar de carregar.
+let registroPendenteParaAbrir = null; // { chave, id }
+function navegarParaRegistro(chave, id) {
+  registroPendenteParaAbrir = { chave, id };
+  navegarPara(chave);
+}
 
 function montarMenuLateral() {
   const menu = document.getElementById("menu-lateral");

@@ -33,6 +33,44 @@ Pages como hospedagem, PWA instalável.
    navegador com um link do tipo "create it here", é só clicar; o
    Firestore cria automaticamente.
 
+## Como dar a uma unidade gestora sua PRÓPRIA conta do Google Drive
+
+Por padrão, todas as unidades gestoras compartilham a mesma conta do
+Drive (a configurada nas variáveis de ambiente da Cloud Function). Se
+uma unidade gestora nova precisar de uma conta separada (ex: um cliente
+diferente, com Drive próprio), siga esses passos — reaproveitando o
+mesmo Client ID/Secret já existente, sem precisar criar credencial OAuth
+nova nem Cloud Function nova:
+
+1. **Redeploy da Cloud Function** (só precisa fazer uma vez, para
+   habilitar esse recurso): copie o conteúdo de `index.js` desta entrega
+   por cima do código atual da função `obter-token-drive`, no Google
+   Cloud Console → Cloud Run → clique na função → "✏️ Editar e implantar
+   uma nova revisão" → cole o código novo na aba `index.js` → Implantar.
+   Não precisa mexer nas variáveis de ambiente.
+2. **Gerar o Refresh Token da conta nova**: acesse
+   [developers.google.com/oauthplayground](https://developers.google.com/oauthplayground),
+   configure com o **mesmo Client ID e Client Secret** já usados (⚙️ →
+   "Use your own OAuth credentials"), autorize o escopo
+   `https://www.googleapis.com/auth/drive.file`, faça login com a **conta
+   Google nova** (a que vai ser dona do armazenamento dessa unidade
+   gestora específica), e troque o código de autorização pelo token —
+   o mesmo processo já documentado mais abaixo neste README.
+3. **Salvar no app**: vá em **Unidades Gestoras** (menu, só
+   administrador) → abra a unidade gestora desejada → cole o Refresh
+   Token novo no campo "Refresh Token do Google Drive (opcional)" →
+   Salvar.
+
+Pronto — a partir daí, todo upload/visualização/download feito com essa
+unidade gestora selecionada usa a conta do Drive dela, automaticamente.
+Unidades gestoras sem esse campo preenchido continuam usando a conta
+compartilhada padrão.
+
+**Sobre segurança**: esse token não fica no documento principal da
+unidade gestora (que qualquer usuário dela pode ler) — fica numa
+subcoleção separada (`entidades/{id}/config/drive`), protegida por regra
+do Firestore pra só administrador conseguir ler ou escrever.
+
 ## Decisões técnicas e por quê
 
 - **Armazenamento dos PDFs no Google Drive, não no Firebase Storage**:
@@ -141,7 +179,217 @@ que uma entrega alterar código**, essa constante deve ser atualizada
 junto com o número de versão do cache-busting (`?v=`) nos scripts do
 `index.html` — os dois devem ficar sincronizados.
 
+## Testando localmente, sem subir pro GitHub
+
+Sim, dá pra testar tudo localmente antes de subir — importante quando
+tem outra pessoa mexendo no repositório ao mesmo tempo. Só um detalhe:
+**não dá pra simplesmente abrir o `index.html` clicando duas vezes**
+(o Firebase Auth não funciona bem com o protocolo `file://`). É preciso
+rodar um servidor local simples:
+
+- **Com Python instalado** (Windows/Mac já costuma vir): abra um
+  terminal na pasta do app e rode `python -m http.server 8000` (ou
+  `python3 -m http.server 8000` no Mac/Linux) → acesse
+  `http://localhost:8000` no navegador.
+- **Com VS Code**: instale a extensão "Live Server", clique com o botão
+  direito no `index.html` → "Open with Live Server".
+
+**Antes de testar**, autorize esse endereço local nos dois lugares onde
+o app precisa de permissão (isso é só adicionar, não remove nem afeta o
+que já está autorizado pra produção):
+1. **Firebase Console** → Authentication → Settings → Authorized
+   domains → adicionar `localhost`.
+2. **Google Cloud Console** → Google Auth Platform → Clientes → o
+   cliente "SOFT+ Digitalizador - Web" → em "Origens JavaScript
+   autorizadas", adicionar `http://localhost:8000` (ajuste a porta se
+   usar outra).
+
+Depois disso, o app funciona 100% localmente — login, Firestore, Drive,
+tudo — sem precisar publicar nada no GitHub Pages até você confirmar que
+está tudo certo.
+
 ## Changelog
+
+**v4.6** — "Licitação de origem" virou obrigatória no cadastro de
+Processo de Despesa — ou você vincula uma licitação, ou marca a nova
+caixa **"Processo sem licitação vinculada"**, que libera salvar sem
+vínculo (e desabilita/limpa o campo de busca enquanto marcada). Não
+tem como mais salvar uma despesa sem decidir um dos dois.
+**Atenção**: despesas cadastradas antes dessa versão, sem licitação
+vinculada e sem essa marcação, vão pedir essa decisão da próxima vez
+que forem abertas e salvas — é o comportamento esperado, não é bug.
+
+**v4.5** — Duas correções na Atualização em Massa:
+- A busca de "Selecionar da lista" só checava o campo Objeto em
+  qualquer coleção — corrigido pra buscar nos mesmos campos usados no
+  resto do app (número do empenho, ordem de pagamento, credor, número
+  da licitação, modalidade, etc.), dependendo da coleção escolhida.
+- O "Novo valor" pra campos relacionados (ex: Licitação de origem) era
+  uma lista fixa de até 500 itens sem busca nenhuma — virou um campo de
+  busca com sugestões, igual ao resto do app, muito mais fácil de achar
+  o registro certo sem se confundir.
+
+**v4.4** — O dropdown de "Novo valor" na Atualização em Massa agora
+mostra a modalidade quando o registro é uma licitação (ex: "015/2026 —
+Inexigibilidade — Contratação..."), igual já acontece no autocomplete
+de "Licitação de origem" dentro da Despesa. Licitações ainda não
+reindexadas (sem `modalidadeNome` preenchido) aparecem sem essa parte —
+rode Manutenção → Reindexar Licitações se precisar.
+
+**v4.3** — Atualização em Massa reconstruída, com os 3 pedidos do
+cliente:
+1. **Selecionar registros específicos**: além de filtrar por critério
+   (campo = valor), agora dá pra buscar e marcar manualmente quais
+   registros exatos você quer atualizar, com checkbox numa lista.
+2. **Campo a atualizar por dropdown**: em vez de digitar o nome do
+   campo (sujeito a erro de digitação), escolhe de uma lista com os
+   campos conhecidos de cada coleção.
+3. **Campos relacionados a outra tabela**: quando o campo escolhido é
+   uma referência (ex: Fonte de Recurso, Credor, Licitação de origem),
+   o "novo valor" vira um dropdown com os registros de verdade daquela
+   tabela (pelo nome, não pelo ID) — e, quando existe um nome copiado
+   por conveniência junto ao vínculo (ex: nome do credor gravado direto
+   na despesa), esse nome é sincronizado automaticamente, evitando
+   dado inconsistente.
+
+**v4.2** — Nova ferramenta na aba Manutenção: **⚙️ Atualização em
+Massa**. Permite gravar o mesmo valor num campo específico, em vários
+registros de uma coleção de uma vez (com filtro opcional pra escolher
+quais registros afeta), sem precisar editar um por um nem escrever
+nenhum script técnico. Sempre pede pra contar quantos registros seriam
+afetados antes de liberar o botão de aplicar, e pede confirmação antes
+de gravar de verdade — não tem desfazer automático depois. Funciona bem
+pra campos simples (texto, número, sim/não); não deve ser usada pra
+campos de lista como "anexos".
+
+**v4.1** — Trocado o percentual em texto (fácil de passar despercebido)
+por uma barra de progresso visual de verdade nos botões individuais
+"👁️ Visualizar" e "⬇️ Baixar" de cada anexo — tanto na tela normal de
+edição quanto nos modais "de espiada" (Despesas/Licitação vinculadas).
+
+**v4.0** — Mudança de comportamento por pedido do cliente: o botão
+"🔗 Ver Licitação vinculada" (dentro da Despesa) não navega mais pra
+outra tela — agora abre um modal "de espiada" com os dados da licitação
+e seus anexos (ver/baixar com progresso), igual ao "Ver Despesas
+Vinculadas" já fazia do lado da Licitação. Fechar o modal mantém você
+exatamente na tela da Despesa, sem perder o lugar. Só navega de verdade
+se clicar explicitamente em "✏️ Editar Licitação completa" (mesma ideia
+aplicada em "Abrir processo", dentro do modal de Despesas Vinculadas,
+renomeado pra "✏️ Editar processo completo" pra deixar claro que essa
+é a única ação que sai da tela atual).
+
+**v3.9** — O modal "Despesas Vinculadas" (dentro da Licitação) agora
+mostra os anexos de cada processo individualmente, com botões de
+👁️ visualizar e ⬇️ baixar (e percentual de progresso), em vez de só um
+botão que levava pro registro completo. O botão "Abrir processo" continua
+disponível separadamente, pra quem quiser editar o processo em si.
+
+**v3.8** — Corrigido o botão "🔗 Ver Licitação vinculada" (dentro da
+Despesa): ele navegava até a lista de Licitações, mas não abria o
+registro específico — faltava o mesmo mecanismo de "abrir automático"
+que já existia do lado inverso (Despesas). Agora abre direto.
+
+**v3.7** — O autocomplete de "Licitação de origem" (dentro do Processo
+de Despesa) agora mostra a modalidade junto na lista de sugestões (ex:
+"1/2025 — Inexigibilidade — Contratação..."), não só número/ano/objeto
+— facilita diferenciar licitações com número parecido.
+
+**v3.6** — Corrigida a busca por "número/ano" de Licitações (tanto na
+lista quanto no vínculo dentro da Despesa): estava funcionando como
+"ou" (número batendo OU ano batendo, mostrando qualquer um dos dois
+soltos) em vez de "e" (os dois precisam bater juntos). Agora digitar
+"1/2025" só traz a licitação número 1 do ano 2025, não qualquer
+licitação começando com "1" nem qualquer licitação de 2025.
+
+**v3.5** — Duas correções na busca/navegação de Licitações:
+- A busca (tanto na lista de Licitações quanto no campo "Licitação de
+  origem" dentro da Despesa) agora entende o formato completo
+  "número/ano" (ex: digitar "015/2026"), separando a parte do número da
+  parte do ano automaticamente. Antes, digitar com a barra "/" incluída
+  quebrava a busca porque o número sozinho no banco não tem a barra.
+- O botão "🔗 Ver Despesas Vinculadas" ganhou tratamento de erro
+  visível — antes, se a consulta falhasse por qualquer motivo, nada
+  acontecia ao clicar, sem nenhum aviso. Agora mostra "Carregando..." no
+  botão e, se der erro, avisa com um toast (inclusive apontando se for
+  falta de índice do Firestore).
+
+**Lembrete importante**: essas correções de busca só valem pra
+registros que já têm os campos `numeroNormalizado`/
+`modalidadeNomeNormalizado` preenchidos. Licitações cadastradas antes da
+v3.0 (como as usadas nos testes) precisam ser reindexadas primeiro —
+**Manutenção → Reindexar Licitações** — antes de aparecerem nessas
+buscas. O botão "🔗 Ver Licitação vinculada" dentro da Despesa também só
+aparece depois que o vínculo realmente foi salvo com sucesso (ou seja,
+depois que a busca já estiver funcionando e você conseguir selecionar a
+licitação na lista de sugestões).
+
+**v3.4** — Completada a cobertura de barras de progresso: agora também
+nos botões individuais "👁️ Visualizar" e "⬇️ Baixar" de cada anexo (que
+antes não davam nenhum feedback durante o download), mostrando o
+percentual ao lado do botão. A exportação em `.zip` também passou a
+calcular o percentual geral considerando o progresso *dentro* de cada
+arquivo (bytes já baixados do PDF atual), não só a contagem de arquivos
+concluídos — fica mais preciso pra PDFs grandes. Tanto o download
+individual quanto o do `.zip` agora usam `XMLHttpRequest` em vez de
+`fetch`, pelo mesmo motivo do upload: só o XHR expõe o progresso de
+verdade enquanto a operação está rolando.
+
+**v3.3** — Barra de progresso com percentual adicionada em todos os
+lugares que antes só mostravam texto genérico ("Importando...",
+"Exportando...", "Reindexando..."): exportação de PDFs em lote (.zip),
+importação e exportação de planilha (atualiza linha por linha), e todos
+os reindexadores da aba Manutenção (atualiza conforme grava os lotes no
+Firestore). Criado um componente reutilizável (`criarBarraProgressoInline`)
+pra não repetir essa lógica em cada lugar.
+
+**v3.2** — Correção definitiva do alinhamento do checkbox de seleção: a
+tentativa anterior (v3.1) resolveu o alinhamento vertical, mas deixou
+um espaço grande entre o checkbox e o texto, porque o cartão tinha 3
+elementos lado a lado (checkbox, conteúdo, ações) disputando o espaço
+livre de forma desigual. Agora o checkbox e o conteúdo ficam agrupados
+num mesmo bloco interno, então o cartão volta a ter só 2 elementos no
+nível principal (o bloco checkbox+conteúdo, e as ações) — mesmo
+comportamento confiável que já existia antes de mexer nisso.
+
+**v3.1** — Corrigido o alinhamento vertical do checkbox de seleção nos
+cartões com várias linhas (ficava centralizado no meio do cartão em vez
+de alinhado no topo). Adicionado o botão "☑️ Selecionar todos", que
+marca de uma vez todos os registros já carregados na tela (respeitando
+o filtro/busca atual).
+
+**v3.0** — Entrega grande, por pedido do cliente:
+- **Drive por unidade gestora**: cada unidade gestora pode ter sua
+  própria conta do Google Drive (Refresh Token configurável em Unidades
+  Gestoras, guardado numa subcoleção protegida só pra administrador).
+  **Exige redeploy da Cloud Function** — veja a seção "Como dar a uma
+  unidade gestora sua própria conta do Google Drive" acima.
+- **Busca de Licitações corrigida**: antes só considerava o campo
+  Objeto, apesar do texto prometer número/ano/objeto. Agora busca de
+  verdade por número, modalidade e objeto (e por ano, se digitar 4
+  dígitos). A mesma melhoria foi aplicada na busca usada pra vincular
+  uma Licitação a um Processo de Despesa.
+- **Navegação cruzada**: dentro de uma Despesa vinculada a uma
+  Licitação, aparece o botão "🔗 Ver Licitação vinculada". Dentro de uma
+  Licitação já salva, aparece "🔗 Ver Despesas Vinculadas", que abre a
+  lista de todos os processos de despesa ligados a ela.
+- **Exportação de PDFs em lote**: dentro da lista de despesas vinculadas
+  a uma licitação, um botão baixa todos os PDFs de uma vez, compactados
+  num `.zip`. Além disso, Licitações, Despesas, Legislação e Documentos
+  Diversos ganharam checkbox de seleção em cada cartão + uma barra
+  "Exportar selecionados", pra exportar os PDFs de vários registros
+  escolhidos à mão de uma só vez.
+- **Filtro "📎 Com anexo"**: complementa o "📋 Sem anexo" que já existia,
+  nos mesmos 4 módulos. Também foi adicionada uma marcação visual (📎)
+  ao lado do botão editar nos cartões que já têm algum anexo.
+- Reindexador de Licitações (aba Manutenção) atualizado pra também
+  preencher os campos novos de busca (número e modalidade normalizados).
+
+**Atenção**: assim como aconteceu com outros campos de busca no
+passado, licitações cadastradas antes dessa versão só vão aparecer na
+busca por número/modalidade depois de reindexadas (Manutenção →
+Reindexar Licitações) ou salvas de novo manualmente. O mesmo vale pros
+filtros "Com anexo"/"Sem anexo" em qualquer registro cadastrado antes da
+v1.5/v1.9 que ainda não tenha sido reindexado.
 
 **v2.7** — Reestruturada a aba Relatórios, por pedido do cliente: em
 vez do valor em R$ e do detalhamento por Unidade Orçamentária/Fonte de

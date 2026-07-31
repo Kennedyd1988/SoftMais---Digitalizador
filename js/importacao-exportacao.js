@@ -131,6 +131,9 @@ function adicionarBotoesImportExport(container, opcoes) {
     <button type="button" class="botao-secundario" id="btn-exportar-planilha">⬇️ Exportar</button>
     <input type="file" id="campo-arquivo-planilha" accept=".xlsx" class="oculto">
   `;
+  const areaProgresso = document.createElement("div");
+  areaProgresso.className = "area-progresso-planilha";
+  grupo.appendChild(areaProgresso);
   container.appendChild(grupo);
 
   grupo.querySelector("#btn-modelo-planilha").addEventListener("click", () => {
@@ -146,6 +149,7 @@ function adicionarBotoesImportExport(container, opcoes) {
     inputArquivo.value = "";
 
     const botao = grupo.querySelector("#btn-importar-planilha");
+    const barra = criarBarraProgressoInline(areaProgresso, "Importando");
     await executarComFeedback(botao, async () => {
       try {
         const linhas = await lerPlanilhaImportacao(arquivo);
@@ -164,10 +168,13 @@ function adicionarBotoesImportExport(container, opcoes) {
           } catch (erroLinha) {
             erros.push(`Linha ${i + 2}: ${erroLinha.message}`);
           }
+          barra.atualizar(i + 1, linhas.length, "Lendo planilha");
         }
 
         if (documentosValidos.length > 0) {
+          barra.atualizar(0, documentosValidos.length, "Gravando");
           await gravarDocumentosEmLotes(opcoes.nomeColecao, documentosValidos);
+          barra.atualizar(documentosValidos.length, documentosValidos.length, "Gravando");
         }
 
         mostrarResumoImportacao(documentosValidos.length, erros);
@@ -176,24 +183,34 @@ function adicionarBotoesImportExport(container, opcoes) {
         }
       } catch (erro) {
         mostrarToast(erro.message, "erro");
+      } finally {
+        barra.remover();
       }
     }, "Importando...");
   });
 
   grupo.querySelector("#btn-exportar-planilha").addEventListener("click", async () => {
     const botao = grupo.querySelector("#btn-exportar-planilha");
+    const barra = criarBarraProgressoInline(areaProgresso, "Exportando");
     await executarComFeedback(botao, async () => {
-      const snapshot = await colecaoEntidade(opcoes.nomeColecao).get();
-      const linhas = [];
-      for (const doc of snapshot.docs) {
-        const linha = await opcoes.montarLinhaExportacao({ id: doc.id, ...doc.data() });
-        linhas.push(linha);
+      try {
+        const snapshot = await colecaoEntidade(opcoes.nomeColecao).get();
+        const linhas = [];
+        for (const [indice, doc] of snapshot.docs.entries()) {
+          const linha = await opcoes.montarLinhaExportacao({ id: doc.id, ...doc.data() });
+          linhas.push(linha);
+          barra.atualizar(indice + 1, snapshot.docs.length, "Exportando");
+        }
+        if (linhas.length === 0) {
+          mostrarToast("Não há registros para exportar.", "info");
+          return;
+        }
+        exportarParaPlanilha(opcoes.titulo, opcoes.colunas, linhas);
+      } catch (erro) {
+        mostrarToast(erro.message || "Erro ao exportar.", "erro");
+      } finally {
+        barra.remover();
       }
-      if (linhas.length === 0) {
-        mostrarToast("Não há registros para exportar.", "info");
-        return;
-      }
-      exportarParaPlanilha(opcoes.titulo, opcoes.colunas, linhas);
     }, "Exportando...");
   });
 }

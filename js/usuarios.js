@@ -159,12 +159,26 @@ async function renderizarUnidadesGestoras(area) {
     return cartao;
   }
 
-  function abrirFormulario(registro = null) {
+  async function abrirFormulario(registro = null) {
+    let refreshTokenAtual = "";
+    if (registro) {
+      const docConfig = await db.collection("entidades").doc(registro.id).collection("config").doc("drive").get();
+      refreshTokenAtual = docConfig.exists ? docConfig.data().refreshToken || "" : "";
+    }
+
     criarModal(`${registro ? "Editar" : "Nova"} Unidade Gestora`, `
       <label>Nome *</label>
       <input type="text" id="campo-nome" value="${registro?.nome || ""}">
       <label>CNPJ</label>
       <input type="text" id="campo-cnpj" value="${registro?.cnpj || ""}">
+      <label>Refresh Token do Google Drive (opcional)</label>
+      <input type="text" id="campo-drive-refresh-token" value="${refreshTokenAtual}" placeholder="Deixe em branco pra usar a conta compartilhada padrão">
+      <p class="texto-secundario" style="margin-top:4px">
+        Só preencha se esta unidade gestora tiver sua PRÓPRIA conta do
+        Google Drive (separada das demais). Veja no README como gerar
+        esse token pra uma conta nova. Fica guardado à parte, visível só
+        pra administradores.
+      </p>
     `, async (botaoSalvar) => {
       const campoNome = document.getElementById("campo-nome");
       limparCampoInvalido(campoNome);
@@ -173,11 +187,21 @@ async function renderizarUnidadesGestoras(area) {
 
       await executarComFeedback(botaoSalvar, async () => {
         const dados = { nome, cnpj: document.getElementById("campo-cnpj").value.trim() };
+        let entidadeId = registro?.id;
         if (registro) {
           await db.collection("entidades").doc(registro.id).update(dados);
         } else {
-          await db.collection("entidades").add(dados);
+          const refNovo = await db.collection("entidades").add(dados);
+          entidadeId = refNovo.id;
         }
+
+        // Guarda o refresh token à parte, numa subcoleção só legível por
+        // administrador (ver firestore.rules) — nunca no documento
+        // principal da entidade, que qualquer usuário dela pode ler.
+        const refreshToken = document.getElementById("campo-drive-refresh-token").value.trim();
+        await db.collection("entidades").doc(entidadeId).collection("config").doc("drive")
+          .set({ refreshToken: refreshToken || null });
+
         fecharModal();
         mostrarToast("Unidade gestora salva com sucesso.", "sucesso");
         carregarLista();

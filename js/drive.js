@@ -7,14 +7,20 @@
 // temporário (access token) pra Cloud Function obterTokenDrive sempre
 // que precisa subir, ver ou baixar um arquivo.
 
-let cacheTokenDrive = { valor: null, expiraEm: 0 };
+// Cache por unidade gestora — importante, porque cada uma pode ter sua
+// própria conta do Drive (ver função obterAccessTokenDrive). Um cache
+// único e global serviria o token errado se o usuário trocasse de
+// unidade gestora no meio da sessão.
+let cacheTokenDrivePorEntidade = {};
 
 /** Devolve um access token válido, renovando com a Cloud Function se preciso */
 async function obterAccessTokenDrive() {
+  const entidadeId = estado.entidadeAtual;
+  const cache = cacheTokenDrivePorEntidade[entidadeId] || { valor: null, expiraEm: 0 };
   const agora = Date.now();
   // Renova um pouco antes de expirar (margem de 60s) pra evitar corrida
-  if (cacheTokenDrive.valor && agora < cacheTokenDrive.expiraEm - 60000) {
-    return cacheTokenDrive.valor;
+  if (cache.valor && agora < cache.expiraEm - 60000) {
+    return cache.valor;
   }
 
   const idToken = await estado.usuario.getIdToken();
@@ -24,6 +30,7 @@ async function obterAccessTokenDrive() {
       Authorization: `Bearer ${idToken}`,
       "Content-Type": "application/json",
     },
+    body: JSON.stringify({ entidadeId }),
   });
 
   if (!resposta.ok) {
@@ -31,9 +38,11 @@ async function obterAccessTokenDrive() {
   }
 
   const dados = await resposta.json();
-  cacheTokenDrive.valor = dados.access_token;
-  cacheTokenDrive.expiraEm = agora + dados.expires_in * 1000;
-  return cacheTokenDrive.valor;
+  cacheTokenDrivePorEntidade[entidadeId] = {
+    valor: dados.access_token,
+    expiraEm: agora + dados.expires_in * 1000,
+  };
+  return dados.access_token;
 }
 
 /**
@@ -180,28 +189,58 @@ function enviarComProgresso(url, cabecalhos, corpo, aoProgresso) {
   });
 }
 
+/**
+ * Baixa um arquivo via XMLHttpRequest acompanhando o progresso real em
+ * bytes (mesmo motivo do upload: fetch não avisa progresso de download
+ * enquanto está rolando, só quando termina).
+ */
+function baixarComProgresso(url, token, aoProgresso) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("GET", url);
+    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.responseType = "blob";
+
+    xhr.onprogress = (evento) => {
+      if (evento.lengthComputable) {
+        aoProgresso?.(Math.round((evento.loaded / evento.total) * 100));
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        aoProgresso?.(100);
+        resolve(xhr.response);
+      } else {
+        reject(new Error("Não foi possível baixar o documento."));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error("Erro de rede ao baixar o documento."));
+    xhr.send();
+  });
+}
+
 /** Abre o PDF numa aba nova, buscando os bytes com autenticação */
-async function visualizarAnexo(driveFileId) {
+async function visualizarAnexo(driveFileId, aoProgredir) {
   const token = await obterAccessTokenDrive();
-  const resposta = await fetch(
+  const blob = await baixarComProgresso(
     `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`,
-    { headers: { Authorization: `Bearer ${token}` } }
+    token,
+    aoProgredir
   );
-  if (!resposta.ok) throw new Error("Não foi possível abrir o documento.");
-  const blob = await resposta.blob();
   const url = URL.createObjectURL(blob);
   window.open(url, "_blank");
 }
 
 /** Baixa o PDF para o computador do usuário */
-async function baixarAnexo(driveFileId, nomeArquivo) {
+async function baixarAnexo(driveFileId, nomeArquivo, aoProgredir) {
   const token = await obterAccessTokenDrive();
-  const resposta = await fetch(
+  const blob = await baixarComProgresso(
     `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`,
-    { headers: { Authorization: `Bearer ${token}` } }
+    token,
+    aoProgredir
   );
-  if (!resposta.ok) throw new Error("Não foi possível baixar o documento.");
-  const blob = await resposta.blob();
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -217,6 +256,66 @@ async function excluirAnexoDrive(driveFileId) {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });
+}
+
+/**
+ * Baixa vários anexos de uma vez, compactados num único .zip. Usado
+ * tanto na exportação em lote (seleção de registros) quanto na
+ * exportação de "todos os PDFs de uma licitação e suas despesas
+ * vinculadas".
+ * @param {Array} listaDeAnexos - [{ driveFileId, nomeArquivo }]
+ * @param {string} nomeArquivoZip
+ * @param {Function} [aoProgredir] - recebe (percentualGeral, concluidos, total)
+ */
+async function exportarAnexosComoZip(listaDeAnexos, nomeArquivoZip, aoProgredir) {
+  if (listaDeAnexos.length === 0) {
+    throw new Error("Não há nenhum PDF pra exportar.");
+  }
+
+  const token = await obterAccessTokenDrive();
+  const zip = new JSZip();
+  const nomesUsados = new Set();
+  const total = listaDeAnexos.length;
+
+  for (let i = 0; i < total; i++) {
+    const anexo = listaDeAnexos[i];
+    let blob;
+    try {
+      blob = await baixarComProgresso(
+        `https://www.googleapis.com/drive/v3/files/${anexo.driveFileId}?alt=media`,
+        token,
+        (percentualArquivo) => {
+          // Progresso geral = arquivos já concluídos + fração do atual
+          const percentualGeral = Math.round(((i + percentualArquivo / 100) / total) * 100);
+          aoProgredir?.(percentualGeral, i + 1, total);
+        }
+      );
+    } catch (erro) {
+      console.warn(`Não foi possível baixar "${anexo.nomeArquivo}", pulando.`);
+      aoProgredir?.(Math.round(((i + 1) / total) * 100), i + 1, total);
+      continue;
+    }
+
+    // Evita sobrescrever se dois anexos tiverem o mesmo nome dentro do zip
+    let nomeFinal = anexo.nomeArquivo;
+    let contador = 2;
+    while (nomesUsados.has(nomeFinal)) {
+      nomeFinal = anexo.nomeArquivo.replace(/\.pdf$/i, ` (${contador}).pdf`);
+      contador++;
+    }
+    nomesUsados.add(nomeFinal);
+
+    zip.file(nomeFinal, blob);
+    aoProgredir?.(Math.round(((i + 1) / total) * 100), i + 1, total);
+  }
+
+  const blobZip = await zip.generateAsync({ type: "blob" });
+  const url = URL.createObjectURL(blobZip);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = nomeArquivoZip;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 /** Conta as páginas do PDF localmente, usando PDF.js, antes do upload */

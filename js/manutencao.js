@@ -58,6 +58,25 @@ async function renderizarManutencao(area) {
     </div>
 
     <div class="cartao-manutencao">
+      <h3>🔄 Migrar Anexos pro Drive Próprio desta Unidade Gestora</h3>
+      <p class="texto-secundario">
+        Se esta unidade gestora já tinha PDFs anexados usando a conta
+        compartilhada, e agora tem um Refresh Token próprio configurado
+        (em Unidades Gestoras), os anexos <strong>antigos</strong> continuam
+        fisicamente na conta compartilhada — só os anexos novos vão
+        direto pra conta própria. Esta ferramenta baixa cada anexo antigo
+        da conta compartilhada e reenvia pra conta própria, atualizando
+        a referência no cadastro. Pode demorar bastante dependendo da
+        quantidade de PDFs. Os arquivos antigos <strong>não são apagados
+        automaticamente</strong> da conta compartilhada — depois de
+        confirmar que a migração funcionou, você pode excluí-los
+        manualmente lá se quiser liberar espaço.
+      </p>
+      <button class="botao-primario" id="btn-migrar-drive">Migrar Anexos</button>
+      <div id="resultado-migracao-drive" class="resultado-manutencao"></div>
+    </div>
+
+    <div class="cartao-manutencao">
       <h3>⚙️ Atualização em Massa</h3>
       <p class="texto-secundario">
         Atualiza o mesmo campo em vários registros de uma coleção de uma
@@ -114,6 +133,37 @@ async function renderizarManutencao(area) {
   `;
 
   configurarAtualizacaoEmMassa();
+
+  document.getElementById("btn-migrar-drive").addEventListener("click", async (evento) => {
+    if (!confirm("Isso vai baixar cada anexo antigo da conta compartilhada e reenviar pra conta própria desta unidade gestora. Pode demorar bastante e não pode ser interrompido no meio sem risco de ficar incompleto. Continuar?")) return;
+
+    const resultadoEl = document.getElementById("resultado-migracao-drive");
+    const barra = criarBarraProgressoInline(resultadoEl, "Migrando anexos");
+
+    await executarComFeedback(evento.target, async () => {
+      try {
+        const resultado = await migrarAnexosParaDriveProprio((feitos, total) => barra.atualizar(feitos, total, "Migrando anexos"));
+        barra.remover();
+        if (resultado.totalAnexos === 0) {
+          resultadoEl.innerHTML = `<p>Nenhum anexo encontrado pra migrar.</p>`;
+          return;
+        }
+        resultadoEl.innerHTML = `
+          <p>✅ ${resultado.migrados} de ${resultado.totalAnexos} anexo(s) migrado(s) com sucesso.</p>
+          ${
+            resultado.falhas.length > 0
+              ? `<p>⚠️ ${resultado.falhas.length} anexo(s) não puderam ser migrados (mantidos apontando pra conta antiga, sem perda de acesso):</p>
+                 <div class="lista-erros-importacao">${resultado.falhas.map((f) => `<div>${f}</div>`).join("")}</div>`
+              : ""
+          }
+        `;
+        mostrarToast("Migração de anexos concluída.", "sucesso");
+      } catch (erro) {
+        barra.remover();
+        resultadoEl.innerHTML = `<p style="color:var(--vermelho-erro)">❌ ${erro.message}</p>`;
+      }
+    }, "Migrando...");
+  });
 
   document.getElementById("btn-reindexar-despesas").addEventListener("click", async (evento) => {
     if (!confirm("Isso vai revisar todos os processos de despesa da unidade gestora atual. Pode levar alguns segundos dependendo da quantidade. Continuar?")) return;
@@ -354,6 +404,82 @@ function rotularRegistroMassa(dados) {
   if (dados.nome) return dados.codigo ? `${dados.codigo} — ${dados.nome}` : dados.nome;
   if (dados.objeto) return dados.objeto.slice(0, 70);
   return "(sem identificação)";
+}
+
+/**
+ * Migra os anexos de todos os registros da unidade gestora atual, da
+ * conta compartilhada do Drive pra conta própria já configurada nela.
+ * Baixa cada PDF com o token da conta compartilhada e reenvia com o
+ * token da conta própria (que passa a ser a conta ativa da unidade
+ * gestora assim que ela tem um Refresh Token próprio configurado).
+ */
+async function migrarAnexosParaDriveProprio(aoProgredir) {
+  // Confirma que a unidade gestora realmente tem uma conta própria
+  // configurada — senão a "migração" reenviaria pra mesma conta de
+  // origem, sem sentido nenhum.
+  const docConfig = await db.collection("entidades").doc(estado.entidadeAtual).collection("config").doc("drive").get();
+  if (!docConfig.exists || !docConfig.data().refreshToken) {
+    throw new Error("Esta unidade gestora ainda não tem um Refresh Token próprio configurado. Configure primeiro em Unidades Gestoras.");
+  }
+
+  const colecoesComAnexo = ["licitacoes", "processosDespesa", "legislacao", "documentosDiversos"];
+  const documentosPorColecao = {};
+  let totalAnexos = 0;
+
+  for (const colecao of colecoesComAnexo) {
+    const snapshot = await colecaoEntidade(colecao).get();
+    documentosPorColecao[colecao] = snapshot.docs
+      .map((doc) => ({ ref: doc.ref, dados: doc.data() }))
+      .filter((d) => (d.dados.anexos || []).length > 0);
+    totalAnexos += documentosPorColecao[colecao].reduce((soma, d) => soma + d.dados.anexos.length, 0);
+  }
+
+  if (totalAnexos === 0) {
+    return { totalAnexos: 0, migrados: 0, falhas: [] };
+  }
+
+  const tokenContaAntiga = await obterAccessTokenDriveCompartilhado();
+  let migrados = 0;
+  const falhas = [];
+
+  for (const colecao of colecoesComAnexo) {
+    for (const documento of documentosPorColecao[colecao]) {
+      const novosAnexos = [];
+      let mudouAlgumAnexo = false;
+
+      for (const anexo of documento.dados.anexos) {
+        try {
+          const resposta = await fetch(`https://www.googleapis.com/drive/v3/files/${anexo.driveFileId}?alt=media`, {
+            headers: { Authorization: `Bearer ${tokenContaAntiga}` },
+          });
+          if (!resposta.ok) throw new Error("Não foi possível baixar da conta antiga.");
+          const blob = await resposta.blob();
+          const arquivo = new File([blob], anexo.nomeArquivo, { type: "application/pdf" });
+
+          // Reenvia usando o token da unidade gestora atual — que já é
+          // a conta própria, já que ela tem Refresh Token configurado.
+          const novoAnexo = await enviarPdfParaDrive(arquivo, colecao, () => {});
+          novoAnexo.volume = anexo.volume;
+          novoAnexo.dataUpload = anexo.dataUpload || new Date().toISOString();
+          novoAnexo.usuarioUpload = anexo.usuarioUpload || estado.usuario.email;
+          novosAnexos.push(novoAnexo);
+          mudouAlgumAnexo = true;
+          migrados++;
+        } catch (erro) {
+          console.warn(`Falha ao migrar anexo "${anexo.nomeArquivo}":`, erro);
+          novosAnexos.push(anexo); // mantém apontando pra conta antiga, não perde a referência
+          falhas.push(`${anexo.nomeArquivo} (${ROTULOS_COLECAO_HISTORICO[colecao] || colecao})`);
+        }
+        aoProgredir?.(migrados + falhas.length, totalAnexos);
+      }
+
+      if (mudouAlgumAnexo) {
+        await documento.ref.update({ anexos: novosAnexos });
+      }
+    }
+  }
+
+  return { totalAnexos, migrados, falhas };
 }
 
 function converterValorMassa(texto) {

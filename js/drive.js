@@ -45,6 +45,38 @@ async function obterAccessTokenDrive() {
   return dados.access_token;
 }
 
+// Cache separado pra conta compartilhada (padrão) — usado só na
+// migração de anexos, quando é preciso buscar arquivos que ainda estão
+// na conta antiga, mesmo já tendo trocado a unidade gestora pra sua
+// própria conta.
+let cacheTokenCompartilhado = { valor: null, expiraEm: 0 };
+
+/** Devolve um access token da conta COMPARTILHADA (padrão), ignorando o Refresh Token próprio da unidade gestora atual */
+async function obterAccessTokenDriveCompartilhado() {
+  const agora = Date.now();
+  if (cacheTokenCompartilhado.valor && agora < cacheTokenCompartilhado.expiraEm - 60000) {
+    return cacheTokenCompartilhado.valor;
+  }
+
+  const idToken = await estado.usuario.getIdToken();
+  const resposta = await fetch(URL_FUNCAO_TOKEN_DRIVE, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${idToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({}), // sem entidadeId → a função usa a conta compartilhada padrão
+  });
+
+  if (!resposta.ok) {
+    throw new Error("Não foi possível conectar à conta compartilhada do Google Drive.");
+  }
+
+  const dados = await resposta.json();
+  cacheTokenCompartilhado = { valor: dados.access_token, expiraEm: agora + dados.expires_in * 1000 };
+  return dados.access_token;
+}
+
 /**
  * Garante que existe (ou cria) a pasta da unidade gestora + submódulo no
  * Drive, e devolve o ID dessa pasta. Os IDs ficam guardados no Firestore

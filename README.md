@@ -210,6 +210,18 @@ está tudo certo.
 
 ## Changelog
 
+**v5.1** — Nova ferramenta em Manutenção: **🔄 Migrar Anexos pro Drive
+Próprio desta Unidade Gestora**. Pra quando uma unidade gestora já tinha
+PDFs anexados na conta compartilhada e depois ganhou uma conta própria
+(Refresh Token configurado) — baixa cada PDF antigo da conta
+compartilhada e reenvia pra conta própria, atualizando a referência no
+cadastro automaticamente. Os arquivos antigos não são apagados
+automaticamente da conta compartilhada (fica por conta do administrador
+excluir manualmente depois de confirmar que deu tudo certo). Se algum
+anexo falhar na migração, ele continua funcionando normalmente (só
+segue apontando pra conta antiga) — a lista de falhas aparece no
+resultado, sem travar o restante.
+
 **v5.0** — Três melhorias grandes, por sugestão própria aceita pelo cliente:
 
 1. **Histórico de Alterações (auditoria)**: nova aba "🕒 Histórico" (só

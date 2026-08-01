@@ -505,20 +505,25 @@ async function renderizarLicitacoes(area) {
           <div class="texto-secundario">${(registro.anexos || []).length} anexo(s)</div>
         </div>
       </div>
-      ${
-        usuarioPodeEditar()
-          ? `<div class="acoes-cartao">
-               ${temAnexo(registro) ? `<span class="badge-anexo" title="Tem anexo">📎</span>` : ""}
-               <button class="botao-icone" data-acao="editar">✏️</button>
-               <button class="botao-icone" data-acao="excluir">🗑️</button>
-             </div>`
-          : ""
-      }
+      <div class="acoes-cartao">
+        ${temAnexo(registro) ? `<span class="badge-anexo" title="Tem anexo">📎</span>` : ""}
+        <button class="botao-icone" data-acao="ver-vinculados" title="Ver Despesas Vinculadas">🔗</button>
+        ${
+          usuarioPodeEditar()
+            ? `<button class="botao-icone" data-acao="editar">✏️</button>
+               <button class="botao-icone" data-acao="excluir">🗑️</button>`
+            : ""
+        }
+      </div>
     `;
     cartao.querySelector(".checkbox-selecao-registro").addEventListener("click", (evento) => evento.stopPropagation());
     cartao.querySelector(".checkbox-selecao-registro").addEventListener("change", (evento) =>
       gerenciadorSelecao.alternarSelecao(registro, evento.target.checked)
     );
+    cartao.querySelector('[data-acao="ver-vinculados"]').addEventListener("click", (evento) => {
+      evento.stopPropagation();
+      abrirModalDespesasVinculadas(registro, evento.currentTarget);
+    });
     cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", () => abrirFormulario(registro));
     cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) =>
       excluirLicitacao(registro, evento.target)
@@ -1189,20 +1194,25 @@ async function renderizarDespesas(area) {
           <div class="texto-secundario">${(registro.anexos || []).length} anexo(s)</div>
         </div>
       </div>
-      ${
-        usuarioPodeEditar()
-          ? `<div class="acoes-cartao">
-               ${temAnexo(registro) ? `<span class="badge-anexo" title="Tem anexo">📎</span>` : ""}
-               <button class="botao-icone" data-acao="editar">✏️</button>
-               <button class="botao-icone" data-acao="excluir">🗑️</button>
-             </div>`
-          : ""
-      }
+      <div class="acoes-cartao">
+        ${temAnexo(registro) ? `<span class="badge-anexo" title="Tem anexo">📎</span>` : ""}
+        ${registro.licitacaoId ? `<button class="botao-icone" data-acao="ver-vinculada" title="Ver Licitação vinculada">🔗</button>` : ""}
+        ${
+          usuarioPodeEditar()
+            ? `<button class="botao-icone" data-acao="editar">✏️</button>
+               <button class="botao-icone" data-acao="excluir">🗑️</button>`
+            : ""
+        }
+      </div>
     `;
     cartao.querySelector(".checkbox-selecao-registro").addEventListener("click", (evento) => evento.stopPropagation());
     cartao.querySelector(".checkbox-selecao-registro").addEventListener("change", (evento) =>
       gerenciadorSelecao.alternarSelecao(registro, evento.target.checked)
     );
+    cartao.querySelector('[data-acao="ver-vinculada"]')?.addEventListener("click", (evento) => {
+      evento.stopPropagation();
+      abrirModalResumoLicitacaoVinculada(registro.licitacaoId, evento.currentTarget);
+    });
     cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", () => abrirFormulario(registro));
     cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) =>
       excluirDespesa(registro, evento.target)

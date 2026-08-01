@@ -210,6 +210,12 @@ está tudo certo.
 
 ## Changelog
 
+**v4.8** — Botão **🔗** adicionado direto no cartão da listagem (ao
+lado de editar/excluir), em Licitações e Processos de Despesa — abre o
+mesmo modal "de espiada" (Despesas Vinculadas / Licitação vinculada)
+sem precisar abrir o registro pra editar primeiro. Em Despesas, só
+aparece quando o processo realmente tem uma licitação vinculada.
+
 **v4.7** — Mudança importante nas 4 telas com anexo (Licitações,
 Despesas, Legislação, Documentos Diversos):
 - **Filtros combináveis**: busca por texto, filtro de ano e "Sem

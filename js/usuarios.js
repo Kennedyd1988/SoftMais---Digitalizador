@@ -199,6 +199,14 @@ async function renderizarUnidadesGestoras(area) {
         // administrador (ver firestore.rules) — nunca no documento
         // principal da entidade, que qualquer usuário dela pode ler.
         const refreshToken = document.getElementById("campo-drive-refresh-token").value.trim();
+        if (refreshToken !== refreshTokenAtual) {
+          // O token mudou (era outra conta, ou não tinha nenhuma antes)
+          // — as pastas do Drive já cacheadas na entidade pertencem à
+          // conta ANTIGA e não existem na conta nova. Sem limpar isso,
+          // o próximo upload tenta usar uma pasta que não existe mais
+          // pra essa conta, e dá erro "File not found".
+          await db.collection("entidades").doc(entidadeId).update({ pastasDrive: {} });
+        }
         await db.collection("entidades").doc(entidadeId).collection("config").doc("drive")
           .set({ refreshToken: refreshToken || null });
 

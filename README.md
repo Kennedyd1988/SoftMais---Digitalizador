@@ -210,6 +210,19 @@ está tudo certo.
 
 ## Changelog
 
+**v5.2** — Corrigido bug real: ao configurar um Refresh Token novo
+numa unidade gestora que não tinha (ou trocar por outra conta), o app
+mantinha em cache o ID das pastas do Drive criadas na conta ANTIGA
+(campo `pastasDrive` no documento da entidade) — e a próxima tentativa
+de anexar um PDF dava erro "File not found", porque essa pasta não
+existe na conta nova. Agora, sempre que o Refresh Token muda, esse
+cache é limpo automaticamente, e as pastas são recriadas do zero na
+conta certa no próximo upload. **Unidades gestoras que já passaram por
+essa troca antes desta correção** precisam ter o campo `pastasDrive`
+apagado manualmente uma vez no Firestore Console (Firestore →
+`entidades` → o documento → excluir o campo `pastasDrive`) — depois
+disso, o problema não volta.
+
 **v5.1** — Nova ferramenta em Manutenção: **🔄 Migrar Anexos pro Drive
 Próprio desta Unidade Gestora**. Pra quando uma unidade gestora já tinha
 PDFs anexados na conta compartilhada e depois ganhou uma conta própria

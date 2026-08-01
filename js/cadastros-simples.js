@@ -337,9 +337,15 @@ async function renderizarCredores(area) {
           email: document.getElementById("campo-email").value.trim(),
         };
         if (registro) {
+          const nomeMudou = registro.nome !== dados.nome;
           await colecaoEntidade("credores").doc(registro.id).update(dados);
+          await registrarHistorico("credores", registro.id, "editar", `Credor "${dados.nome}" editado.`);
+          if (nomeMudou) {
+            await sincronizarCredorEmDespesas(registro.id, dados.nome, dados.nomeNormalizado);
+          }
         } else {
-          await colecaoEntidade("credores").add(dados);
+          const referenciaNova = await colecaoEntidade("credores").add(dados);
+          await registrarHistorico("credores", referenciaNova.id, "criar", `Credor "${dados.nome}" criado.`);
         }
         fecharModal();
         mostrarToast("Credor salvo com sucesso.", "sucesso");
@@ -360,9 +366,25 @@ async function renderizarCredores(area) {
     }
     if (!confirm(`Excluir "${registro.nome}"?`)) return;
     await colecaoEntidade("credores").doc(registro.id).delete();
+    await registrarHistorico("credores", registro.id, "excluir", `Credor "${registro.nome}" excluído.`);
     mostrarToast("Excluído com sucesso.", "sucesso");
     paginador.reiniciar();
     carregarPagina(true);
+  }
+
+  /**
+   * Quando o nome de um credor muda, o nome que fica copiado nas
+   * despesas vinculadas (usado por conveniência de exibição/busca) fica
+   * desatualizado. Pergunta se quer sincronizar.
+   */
+  async function sincronizarCredorEmDespesas(credorId, nomeNovo, nomeNormalizadoNovo) {
+    const snapshot = await colecaoEntidade("processosDespesa").where("credorId", "==", credorId).get();
+    if (snapshot.empty) return;
+    if (!confirm(`O nome desse credor mudou, e ele está vinculado a ${snapshot.size} despesa(s). Atualizar o nome exibido nelas também?`)) return;
+    const lote = db.batch();
+    snapshot.docs.forEach((doc) => lote.update(doc.ref, { credorNome: nomeNovo, credorNomeNormalizado: nomeNormalizadoNovo }));
+    await lote.commit();
+    mostrarToast(`${snapshot.size} despesa(s) atualizada(s) com o novo nome do credor.`, "sucesso");
   }
 
   document.getElementById("btn-novo")?.addEventListener("click", () => abrirFormulario());

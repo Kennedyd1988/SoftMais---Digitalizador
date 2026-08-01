@@ -270,6 +270,8 @@ input:focus, select:focus, textarea:focus {
 .cartao-resumo { background: var(--branco); border: 1px solid var(--cinza-borda); border-radius: var(--raio, 10px); padding: 16px; }
 .numero-resumo { font-size: 22px; font-weight: 600; color: var(--azul-principal); }
 .rotulo-resumo { font-size: 13px; color: var(--cinza-texto); margin-top: 4px; }
+.cartao-atencao { transition: box-shadow 0.15s; }
+.cartao-atencao:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-color: var(--azul-principal); }
 .tabela-relatorio { width: 100%; border-collapse: collapse; margin-bottom: 24px; background: var(--branco); border: 1px solid var(--cinza-borda); border-radius: var(--raio, 10px); overflow: hidden; }
 .tabela-relatorio th, .tabela-relatorio td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--cinza-borda); font-size: 13px; }
 .tabela-relatorio th:nth-child(2), .tabela-relatorio th:nth-child(3),

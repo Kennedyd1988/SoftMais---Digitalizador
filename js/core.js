@@ -7,7 +7,7 @@
 // e na tela de login, para facilitar conferir se o navegador já está
 // com a versão mais recente (ajuda a identificar problema de cache).
 // ===================================================================
-const VERSAO_APP = "4.8";
+const VERSAO_APP = "5.0";
 document.addEventListener("DOMContentLoaded", () => {
   const elementoLogin = document.getElementById("versao-app-login");
   if (elementoLogin) elementoLogin.textContent = `v${VERSAO_APP}`;
@@ -336,6 +336,7 @@ const ITENS_MENU = [
   { chave: "usuarios", rotulo: "Usuários", icone: "👤", modulo: "usuarios", somenteAdmin: true },
   { chave: "unidades-gestoras", rotulo: "Unidades Gestoras", icone: "🏢", modulo: "unidadesGestoras", somenteAdmin: true },
   { chave: "manutencao", rotulo: "Manutenção", icone: "🔧", modulo: "manutencao", somenteAdmin: true },
+  { chave: "historico", rotulo: "Histórico", icone: "🕒", modulo: "historico", somenteAdmin: true },
 ];
 
 let paginaAtual = "inicio";
@@ -438,19 +439,97 @@ function navegarPara(chave) {
     case "manutencao":
       renderizarManutencao(area);
       break;
+    case "historico":
+      renderizarHistorico(area);
+      break;
     default:
       area.innerHTML = "<p>Página não encontrada.</p>";
   }
 }
 
-function renderizarInicio(area) {
+async function renderizarInicio(area) {
   area.innerHTML = `
     <div class="cartao-boas-vindas">
       <h2>Bem-vindo(a), ${estado.dadosUsuario.nome || estado.usuario.email}</h2>
       <p>Unidade gestora atual: <strong>${estado.entidadeAtualNome}</strong></p>
-      <p>Use o menu ao lado para acessar os cadastros e processos.</p>
     </div>
+    <div id="area-dashboard"><p class="texto-secundario" style="margin-top:16px">Calculando resumo do ano...</p></div>
   `;
+
+  if (!usuarioTemAcessoAba("despesas") && !usuarioEhAdministrador()) {
+    // Usuário sem acesso a Despesas não precisa do dashboard financeiro
+    document.getElementById("area-dashboard").innerHTML = `<p class="texto-secundario" style="margin-top:16px">Use o menu ao lado para acessar os cadastros e processos.</p>`;
+    return;
+  }
+
+  try {
+    const anoAtual = new Date().getFullYear();
+    const inicioCompetencia = `${anoAtual}-01`;
+    const fimCompetencia = `${anoAtual}-12`;
+
+    const [snapshotDespesas, snapshotLicitacoes, snapshotLegislacao, snapshotDocumentos] = await Promise.all([
+      colecaoEntidade("processosDespesa").where("competenciaKey", ">=", inicioCompetencia).where("competenciaKey", "<=", fimCompetencia).get(),
+      colecaoEntidade("licitacoes").where("ano", "==", anoAtual).get(),
+      colecaoEntidade("legislacao").where("ano", "==", anoAtual).get(),
+      colecaoEntidade("documentosDiversos").where("ano", "==", anoAtual).get(),
+    ]);
+
+    const despesas = snapshotDespesas.docs.map((doc) => doc.data());
+    const totalValor = despesas.reduce((soma, d) => soma + (d.valor || 0), 0);
+    const semAnexo = despesas.filter((d) => !temAnexoGenerico(d)).length;
+    const semLicitacao = despesas.filter((d) => !d.licitacaoId && !d.semLicitacaoVinculada).length;
+
+    document.getElementById("area-dashboard").innerHTML = `
+      <h3 style="margin-top:20px">Resumo de ${anoAtual}</h3>
+      <div class="grade-resumo">
+        <div class="cartao-resumo">
+          <div class="numero-resumo num">${formatarMoeda(totalValor)}</div>
+          <div class="rotulo-resumo">Total de Despesas (${despesas.length} processo(s))</div>
+        </div>
+        <div class="cartao-resumo">
+          <div class="numero-resumo num">${snapshotLicitacoes.size}</div>
+          <div class="rotulo-resumo">Licitações</div>
+        </div>
+        <div class="cartao-resumo">
+          <div class="numero-resumo num">${snapshotLegislacao.size}</div>
+          <div class="rotulo-resumo">Atos de Legislação</div>
+        </div>
+        <div class="cartao-resumo">
+          <div class="numero-resumo num">${snapshotDocumentos.size}</div>
+          <div class="rotulo-resumo">Documentos Diversos</div>
+        </div>
+      </div>
+
+      ${
+        semAnexo > 0 || semLicitacao > 0
+          ? `<h3>Pontos de atenção</h3>
+             <div class="grade-resumo">
+               ${semAnexo > 0 ? `
+                 <div class="cartao-resumo cartao-atencao" id="card-despesas-sem-anexo" style="cursor:pointer">
+                   <div class="numero-resumo num" style="color:var(--vermelho-erro)">${semAnexo}</div>
+                   <div class="rotulo-resumo">Despesa(s) de ${anoAtual} sem PDF anexado</div>
+                 </div>` : ""}
+               ${semLicitacao > 0 ? `
+                 <div class="cartao-resumo cartao-atencao" id="card-despesas-sem-licitacao" style="cursor:pointer">
+                   <div class="numero-resumo num" style="color:var(--amber, #b3790f)">${semLicitacao}</div>
+                   <div class="rotulo-resumo">Despesa(s) de ${anoAtual} sem decisão de licitação</div>
+                 </div>` : ""}
+             </div>`
+          : `<p class="texto-secundario">Nenhum ponto de atenção nas despesas de ${anoAtual} — todas têm anexo e decisão de licitação registrada.</p>`
+      }
+    `;
+
+    document.getElementById("card-despesas-sem-anexo")?.addEventListener("click", () => navegarPara("despesas"));
+    document.getElementById("card-despesas-sem-licitacao")?.addEventListener("click", () => navegarPara("despesas"));
+  } catch (erro) {
+    console.error(erro);
+    document.getElementById("area-dashboard").innerHTML = `<p class="texto-secundario" style="margin-top:16px">Não foi possível calcular o resumo agora. Use o menu ao lado pra acessar os cadastros e processos.</p>`;
+  }
+}
+
+/** Verifica se um registro tem anexo, com fallback pra registros antigos sem quantidadeAnexos (versão local, sem depender de processos.js) */
+function temAnexoGenerico(registro) {
+  return (registro.quantidadeAnexos ?? (registro.anexos || []).length) > 0;
 }
 
 // Referência de coleção da entidade atual (atalho usado pelos módulos)
@@ -460,3 +539,107 @@ function colecaoEntidade(nomeSubcolecao) {
     .doc(estado.entidadeAtual)
     .collection(nomeSubcolecao);
 }
+
+// -------------------------------------------------------------
+// HISTÓRICO DE ALTERAÇÕES (auditoria)
+// -------------------------------------------------------------
+const ROTULOS_COLECAO_HISTORICO = {
+  credores: "Credor/Fornecedor",
+  licitacoes: "Licitação",
+  processosDespesa: "Processo de Despesa",
+  legislacao: "Legislação",
+  documentosDiversos: "Documento Diverso",
+};
+
+/**
+ * Grava uma linha no histórico de alterações, pra fins de auditoria —
+ * quem mexeu em quê e quando. Não trava a operação principal: se der
+ * erro ao gravar o histórico (ex: perda de conexão), só registra no
+ * console, não impede o salvamento/exclusão de ter acontecido.
+ */
+async function registrarHistorico(nomeColecao, documentoId, acao, resumo) {
+  try {
+    await colecaoEntidade("historico").add({
+      colecao: nomeColecao,
+      documentoId,
+      acao, // 'criar' | 'editar' | 'excluir'
+      resumo,
+      usuarioEmail: estado.usuario?.email || "desconhecido",
+      usuarioNome: estado.dadosUsuario?.nome || "",
+      dataHora: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (erro) {
+    console.warn("Não foi possível gravar o histórico desta ação:", erro);
+  }
+}
+
+async function renderizarHistorico(area) {
+  area.innerHTML = `
+    <div class="cabecalho-pagina">
+      <h2>Histórico de Alterações</h2>
+    </div>
+    <div class="barra-busca">
+      <select id="historico-filtro-colecao" class="filtro-ano">
+        <option value="">Todos os tipos</option>
+        <option value="credores">Credores/Fornecedores</option>
+        <option value="licitacoes">Licitações</option>
+        <option value="processosDespesa">Processos de Despesa</option>
+        <option value="legislacao">Legislação</option>
+        <option value="documentosDiversos">Documentos Diversos</option>
+      </select>
+    </div>
+    <div id="lista-registros" class="lista-cartoes"></div>
+    <button id="btn-carregar-mais" class="botao-secundario oculto">Carregar mais</button>
+  `;
+
+  let paginador = criarPaginador(colecaoEntidade("historico").orderBy("dataHora", "desc"));
+
+  function formatarDataHora(timestamp) {
+    if (!timestamp?.toDate) return "-";
+    return timestamp.toDate().toLocaleString("pt-BR");
+  }
+
+  const ROTULOS_ACAO = { criar: "✅ Criou", editar: "✏️ Editou", excluir: "🗑️ Excluiu" };
+
+  function criarCartaoHistorico(item) {
+    const cartao = document.createElement("div");
+    cartao.className = "cartao-registro";
+    cartao.innerHTML = `
+      <div>
+        <strong>${ROTULOS_ACAO[item.acao] || item.acao}</strong> — ${ROTULOS_COLECAO_HISTORICO[item.colecao] || item.colecao}
+        <div class="texto-secundario">${item.resumo || ""}</div>
+        <div class="texto-secundario">${item.usuarioNome || item.usuarioEmail} · ${formatarDataHora(item.dataHora)}</div>
+      </div>
+    `;
+    return cartao;
+  }
+
+  async function carregarPagina(limpar = false) {
+    const lista = document.getElementById("lista-registros");
+    if (limpar) lista.innerHTML = "";
+    try {
+      const registros = await paginador.carregarProximaPagina();
+      registros.forEach((item) => lista.appendChild(criarCartaoHistorico(item)));
+      document.getElementById("btn-carregar-mais").classList.toggle("oculto", !paginador.temMais);
+      if (limpar && registros.length === 0) {
+        lista.innerHTML = `<p class="texto-secundario">Nenhuma alteração registrada ainda.</p>`;
+      }
+    } catch (erro) {
+      tratarErroConsultaFirestore(erro);
+      document.getElementById("btn-carregar-mais").classList.add("oculto");
+    }
+  }
+
+  document.getElementById("btn-carregar-mais").addEventListener("click", () => carregarPagina(false));
+  document.getElementById("historico-filtro-colecao").addEventListener("change", (evento) => {
+    const colecaoEscolhida = evento.target.value;
+    const consulta = colecaoEscolhida
+      ? colecaoEntidade("historico").where("colecao", "==", colecaoEscolhida).orderBy("dataHora", "desc")
+      : colecaoEntidade("historico").orderBy("dataHora", "desc");
+    paginador = criarPaginador(consulta);
+    carregarPagina(true);
+  });
+
+  carregarPagina(true);
+}
+

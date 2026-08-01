@@ -49,6 +49,17 @@ service cloud.firestore {
         allow read, write: if ehAdministrador();
       }
 
+      // Subcoleção "historico" é o registro de auditoria — só
+      // administrador pode ler (é informação sobre o trabalho de todo
+      // mundo), quem edita pode criar linhas novas (é assim que o
+      // histórico é gravado, automaticamente a cada ação), e ninguém
+      // pode editar ou apagar uma linha já gravada.
+      match /historico/{documentoId} {
+        allow read: if ehAdministrador();
+        allow create: if podeEditar() && temAcessoEntidade(entidadeId);
+        allow update, delete: if false;
+      }
+
       // ---------- SUBCOLEÇÕES DE CADA UNIDADE GESTORA ----------
       match /{colecao}/{documentoId} {
         allow read: if temAcessoEntidade(entidadeId);

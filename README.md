@@ -210,6 +210,35 @@ está tudo certo.
 
 ## Changelog
 
+**v5.0** — Três melhorias grandes, por sugestão própria aceita pelo cliente:
+
+1. **Histórico de Alterações (auditoria)**: nova aba "🕒 Histórico" (só
+   administrador), registrando automaticamente quem criou, editou ou
+   excluiu cada Credor, Licitação, Processo de Despesa, Legislação e
+   Documento Diverso, com data/hora. Fica numa subcoleção protegida
+   (`historico`) que só aceita criação — ninguém consegue editar ou
+   apagar uma linha já gravada, nem pela interface nem por acesso direto
+   ao banco (reforçado nas regras do Firestore).
+
+2. **Dashboard na tela de Início**: em vez de só a mensagem de
+   boas-vindas, agora mostra um resumo do ano atual (total de despesas,
+   quantidade de licitações/legislação/documentos) e uma seção "Pontos
+   de atenção" — despesas do ano sem PDF anexado, e despesas sem decisão
+   de licitação (nem vinculada, nem marcada como "sem licitação"). Os
+   cartões de atenção são clicáveis e levam direto pra tela de Despesas.
+
+3. **Sincronização de dados copiados**: ao editar o nome de um Credor
+   (ou o número/ano de uma Licitação) que já está vinculado a alguma
+   despesa, o app pergunta se você quer atualizar automaticamente o
+   nome/identificador copiado nessas despesas também — evita que o nome
+   exibido fique desencontrado do vínculo real depois de uma correção
+   de cadastro.
+
+**⚠️ Esta versão exige republicar o `firestore.rules`** (a subcoleção
+`historico` precisa da regra nova pra funcionar direito — sem isso, a
+gravação do histórico falha silenciosamente, sem travar o resto do app,
+mas sem registrar nada).
+
 **v4.8** — Botão **🔗** adicionado direto no cartão da listagem (ao
 lado de editar/excluir), em Licitações e Processos de Despesa — abre o
 mesmo modal "de espiada" (Despesas Vinculadas / Licitação vinculada)

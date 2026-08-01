@@ -586,10 +586,16 @@ async function renderizarLicitacoes(area) {
           quantidadeAnexos: controleAnexos.obterAnexos().length,
         };
         if (registro) {
+          const numeroOuAnoMudou = registro.numero !== dados.numero || registro.ano !== dados.ano;
           await colecaoEntidade("licitacoes").doc(registro.id).update(dados);
+          await registrarHistorico("licitacoes", registro.id, "editar", `Licitação ${dados.numero}/${dados.ano} editada.`);
+          if (numeroOuAnoMudou) {
+            await sincronizarLicitacaoEmDespesas(registro.id, dados.numero, dados.ano);
+          }
         } else {
           dados.criadoEm = firebase.firestore.FieldValue.serverTimestamp();
-          await colecaoEntidade("licitacoes").add(dados);
+          const referenciaNova = await colecaoEntidade("licitacoes").add(dados);
+          await registrarHistorico("licitacoes", referenciaNova.id, "criar", `Licitação ${dados.numero}/${dados.ano} criada.`);
         }
         fecharModal();
         mostrarToast("Licitação salva com sucesso.", "sucesso");
@@ -636,11 +642,28 @@ async function renderizarLicitacoes(area) {
         try { await excluirAnexoDrive(anexo.driveFileId); } catch (e) { console.warn("Falha ao remover anexo do Drive:", e); }
       }
       await colecaoEntidade("licitacoes").doc(registro.id).delete();
+      await registrarHistorico("licitacoes", registro.id, "excluir", `Licitação ${registro.numero}/${registro.ano} excluída.`);
       fecharModal();
       mostrarToast("Licitação excluída com sucesso.", "sucesso");
       paginador.reiniciar();
       carregarPagina(true);
     }, "Excluindo...");
+  }
+
+  /**
+   * Quando o número/ano de uma licitação muda, o "identificador" que
+   * fica copiado nas despesas vinculadas (usado só pra exibição, ex:
+   * "015/2026") fica desatualizado. Pergunta se quer sincronizar.
+   */
+  async function sincronizarLicitacaoEmDespesas(licitacaoId, numero, ano) {
+    const snapshot = await colecaoEntidade("processosDespesa").where("licitacaoId", "==", licitacaoId).get();
+    if (snapshot.empty) return;
+    if (!confirm(`O número/ano dessa licitação mudou, e ela está vinculada a ${snapshot.size} despesa(s). Atualizar o identificador exibido nelas também?`)) return;
+    const novoIdentificador = `${numero}/${ano}`;
+    const lote = db.batch();
+    snapshot.docs.forEach((doc) => lote.update(doc.ref, { licitacaoIdentificador: novoIdentificador }));
+    await lote.commit();
+    mostrarToast(`${snapshot.size} despesa(s) atualizada(s) com o novo identificador da licitação.`, "sucesso");
   }
 
   document.getElementById("btn-novo")?.addEventListener("click", () => abrirFormulario());
@@ -875,9 +898,11 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
         };
         if (registro) {
           await colecaoEntidade(nomeColecao).doc(registro.id).update(dados);
+          await registrarHistorico(nomeColecao, registro.id, "editar", `${tituloSingular} nº ${dados.numero} editado.`);
         } else {
           dados.criadoEm = firebase.firestore.FieldValue.serverTimestamp();
-          await colecaoEntidade(nomeColecao).add(dados);
+          const referenciaNova = await colecaoEntidade(nomeColecao).add(dados);
+          await registrarHistorico(nomeColecao, referenciaNova.id, "criar", `${tituloSingular} nº ${dados.numero} criado.`);
         }
         fecharModal();
         mostrarToast(`${tituloSingular} salvo com sucesso.`, "sucesso");
@@ -908,6 +933,7 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
         try { await excluirAnexoDrive(anexo.driveFileId); } catch (e) { console.warn("Falha ao remover anexo do Drive:", e); }
       }
       await colecaoEntidade(nomeColecao).doc(registro.id).delete();
+      await registrarHistorico(nomeColecao, registro.id, "excluir", `${tituloSingular} nº ${registro.numero} excluído.`);
       fecharModal();
       mostrarToast(`${tituloSingular} excluído com sucesso.`, "sucesso");
       paginador.reiniciar();
@@ -1358,9 +1384,11 @@ async function renderizarDespesas(area) {
         };
         if (registro) {
           await colecaoEntidade("processosDespesa").doc(registro.id).update(dados);
+          await registrarHistorico("processosDespesa", registro.id, "editar", `Empenho ${dados.numeroEmpenho} editado.`);
         } else {
           dados.criadoEm = firebase.firestore.FieldValue.serverTimestamp();
-          await colecaoEntidade("processosDespesa").add(dados);
+          const referenciaNova = await colecaoEntidade("processosDespesa").add(dados);
+          await registrarHistorico("processosDespesa", referenciaNova.id, "criar", `Empenho ${dados.numeroEmpenho} criado.`);
         }
         fecharModal();
         mostrarToast("Processo de despesa salvo com sucesso.", "sucesso");
@@ -1418,6 +1446,7 @@ async function renderizarDespesas(area) {
         try { await excluirAnexoDrive(anexo.driveFileId); } catch (e) { console.warn("Falha ao remover anexo do Drive:", e); }
       }
       await colecaoEntidade("processosDespesa").doc(registro.id).delete();
+      await registrarHistorico("processosDespesa", registro.id, "excluir", `Empenho ${registro.numeroEmpenho} excluído.`);
       fecharModal();
       mostrarToast("Processo de despesa excluído com sucesso.", "sucesso");
       paginador.reiniciar();

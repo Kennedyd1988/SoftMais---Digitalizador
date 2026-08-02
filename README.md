@@ -210,6 +210,11 @@ está tudo certo.
 
 ## Changelog
 
+**v8.11** — Ajustes finos na tela de login, por pedido direto: logo do
+lado azul aumentada pra 100px de altura; título "Documentos
+organizados, sem complicação" com 22px em tela pequena e 24px em tela
+grande.
+
 **v8.10** — Corrigido: a logo grande do lado azul da tela de login
 ficava achatada — o container flexível estica os filhos por padrão pra
 ocupar toda a largura, e como a altura da imagem estava fixa em 32px,

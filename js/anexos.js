@@ -57,8 +57,15 @@ function renderizarSecaoAnexos(container, anexosIniciais, nomeModulo, aoMudar, o
   const barraProgressoContainer = container.querySelector("#barra-progresso-container");
   const barraProgressoPreenchimento = container.querySelector("#barra-progresso-preenchimento");
 
-  botaoSelecionar.addEventListener("click", () => inputArquivo.click());
-  container.querySelector("#btn-reorganizar-volumes")?.addEventListener("click", () => abrirModalReorganizarVolumes());
+  // Esses elementos (adicionar/reorganizar) só existem no HTML quando o
+  // usuário pode editar — pra usuário só-leitura, botaoSelecionar/
+  // inputArquivo são "null", e chamar addEventListener neles sem essa
+  // checagem quebrava a função inteira ANTES dela chegar na parte que
+  // desenha a lista de anexos — por isso os PDFs nem apareciam.
+  if (usuarioPodeEditar()) {
+    botaoSelecionar.addEventListener("click", () => inputArquivo.click());
+    container.querySelector("#btn-reorganizar-volumes")?.addEventListener("click", () => abrirModalReorganizarVolumes());
+  }
   container.querySelector("#btn-baixar-zip-anexos").addEventListener("click", async (evento) => {
     const areaProgresso = container.querySelector(".secao-anexos");
     const barra = criarBarraProgressoInline(areaProgresso, "Baixando");
@@ -149,11 +156,13 @@ function renderizarSecaoAnexos(container, anexosIniciais, nomeModulo, aoMudar, o
     });
   }
 
-  inputArquivo.addEventListener("change", () => {
-    const arquivo = inputArquivo.files[0];
-    if (!arquivo) return;
-    processarNovoArquivo(arquivo);
-  });
+  if (usuarioPodeEditar()) {
+    inputArquivo.addEventListener("change", () => {
+      const arquivo = inputArquivo.files[0];
+      if (!arquivo) return;
+      processarNovoArquivo(arquivo);
+    });
+  }
 
   async function processarNovoArquivo(arquivoOriginal) {
     const volume = parseInt(container.querySelector("#campo-volume").value, 10) || 1;

@@ -210,6 +210,18 @@ está tudo certo.
 
 ## Changelog
 
+**v8.12** — Corrigido bug real: usuário **somente leitura** não via
+**nenhum PDF** ao abrir um registro, mesmo quando o registro tinha
+anexo. Causa: o botão "+ Adicionar PDF" só existe no HTML pra quem
+edita, mas o código tentava ligar um clique nele **sem checar isso
+antes** — pra quem só visualiza, esse botão não existe (é `null`), e
+tentar usar `.addEventListener` nele quebrava a função inteira bem no
+começo, antes dela chegar na parte que desenha a lista de anexos. Por
+isso a seção "Anexos (PDF)" aparecia completamente vazia pra leitura,
+mesmo quando o registro tinha PDF de verdade (confirmado que aparecia
+normal pra quem edita). Corrigido: agora só tenta ligar os botões de
+adicionar/reorganizar quando eles realmente existem na tela.
+
 **v8.11** — Ajustes finos na tela de login, por pedido direto: logo do
 lado azul aumentada pra 100px de altura; título "Documentos
 organizados, sem complicação" com 22px em tela pequena e 24px em tela

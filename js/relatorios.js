@@ -56,6 +56,8 @@ const ROTULOS_MODULOS = {
   licitacoes: "Licitações",
   legislacao: "Legislação",
   documentosDiversos: "Documentos Diversos",
+  processosPessoal: "Processos de Pessoal",
+  atosAdministrativos: "Atos Administrativos",
 };
 
 /** Soma quantidade de registros, de arquivos anexados e de páginas de uma lista de documentos */
@@ -81,7 +83,7 @@ async function calcularDadosRelatorio(ano) {
   const fimCompetencia = `${ano}-12`;
   const anoNumero = parseInt(ano, 10);
 
-  const [snapshotDespesas, snapshotLicitacoes, snapshotLegislacao, snapshotDocumentos] = await Promise.all([
+  const [snapshotDespesas, snapshotLicitacoes, snapshotLegislacao, snapshotDocumentos, snapshotPessoal, snapshotAtos] = await Promise.all([
     colecaoEntidade("processosDespesa")
       .where("competenciaKey", ">=", inicioCompetencia)
       .where("competenciaKey", "<=", fimCompetencia)
@@ -89,6 +91,8 @@ async function calcularDadosRelatorio(ano) {
     colecaoEntidade("licitacoes").where("ano", "==", anoNumero).get(),
     colecaoEntidade("legislacao").where("ano", "==", anoNumero).get(),
     colecaoEntidade("documentosDiversos").where("ano", "==", anoNumero).get(),
+    colecaoEntidade("processosPessoal").where("exercicio", "==", anoNumero).get(),
+    colecaoEntidade("atosAdministrativos").where("exercicio", "==", anoNumero).get(),
   ]);
 
   return {
@@ -96,12 +100,14 @@ async function calcularDadosRelatorio(ano) {
     licitacoes: resumirModulo(snapshotLicitacoes.docs.map((doc) => doc.data())),
     legislacao: resumirModulo(snapshotLegislacao.docs.map((doc) => doc.data())),
     documentosDiversos: resumirModulo(snapshotDocumentos.docs.map((doc) => doc.data())),
+    processosPessoal: resumirModulo(snapshotPessoal.docs.map((doc) => doc.data())),
+    atosAdministrativos: resumirModulo(snapshotAtos.docs.map((doc) => doc.data())),
   };
 }
 
 function exibirRelatorioNaTela(dados, ano) {
   const area = document.getElementById("area-relatorio");
-  const chaves = ["despesas", "licitacoes", "legislacao", "documentosDiversos"];
+  const chaves = ["despesas", "licitacoes", "legislacao", "documentosDiversos", "processosPessoal", "atosAdministrativos"];
 
   const totalRegistros = chaves.reduce((soma, chave) => soma + dados[chave].quantidadeRegistros, 0);
   const totalArquivos = chaves.reduce((soma, chave) => soma + dados[chave].quantidadeArquivos, 0);
@@ -137,22 +143,44 @@ function exibirRelatorioNaTela(dados, ano) {
 // GERAÇÃO DO PDF
 // -------------------------------------------------------------
 
-/** Desenha o cabeçalho padrão (logo + título) no topo da página atual do PDF */
+/** Desenha o cabeçalho padrão (logo da unidade gestora + dados dela + título) no topo da página atual do PDF */
 function desenharCabecalhoPdf(doc, titulo) {
-  doc.setFontSize(16);
-  doc.setTextColor(13, 79, 196); // azul da marca
-  doc.text("SOFT+", 14, 18);
-  doc.setFontSize(11);
-  doc.setTextColor(90, 90, 90);
-  doc.text("Indexação de Documentos", 32, 18);
+  const entidade = estado.entidadeAtualDados || {};
+  let xTexto = 14;
+
+  if (entidade.logoBase64) {
+    try {
+      doc.addImage(entidade.logoBase64, "PNG", 14, 8, 22, 22, undefined, "FAST");
+      xTexto = 40;
+    } catch (erro) {
+      console.warn("Não foi possível desenhar a logo no PDF:", erro);
+    }
+  }
 
   doc.setFontSize(13);
   doc.setTextColor(15, 41, 71);
-  doc.text(titulo, 14, 30);
+  doc.text(entidade.nome || estado.entidadeAtualNome || "", xTexto, 15);
+
+  doc.setFontSize(8);
+  doc.setTextColor(90, 90, 90);
+  let yInfo = 20;
+  const linhasInfo = [];
+  if (entidade.cnpj) linhasInfo.push(`CNPJ: ${entidade.cnpj}`);
+  if (entidade.endereco) linhasInfo.push(entidade.endereco);
+  if (entidade.telefone || entidade.email) linhasInfo.push([entidade.telefone, entidade.email].filter(Boolean).join(" · "));
+  if (entidade.responsavel) linhasInfo.push(entidade.responsavel);
+  linhasInfo.forEach((linha) => {
+    doc.text(linha, xTexto, yInfo);
+    yInfo += 4;
+  });
+
+  doc.setFontSize(13);
+  doc.setTextColor(13, 79, 196);
+  doc.text(titulo, 14, 36);
 
   doc.setDrawColor(215, 228, 240);
-  doc.line(14, 34, 196, 34);
-  return 42; // posição Y onde o conteúdo pode começar
+  doc.line(14, 40, 196, 40);
+  return 48; // posição Y onde o conteúdo pode começar
 }
 
 /** Desenha o rodapé padrão (data de geração + numeração de página) */
@@ -175,7 +203,7 @@ function gerarRelatorioPdf(dados, ano) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
   const titulo = `Relatório Anual — ${ano}`;
-  const chaves = ["despesas", "licitacoes", "legislacao", "documentosDiversos"];
+  const chaves = ["despesas", "licitacoes", "legislacao", "documentosDiversos", "processosPessoal", "atosAdministrativos"];
 
   let y = desenharCabecalhoPdf(doc, titulo);
 

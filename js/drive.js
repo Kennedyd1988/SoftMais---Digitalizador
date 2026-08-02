@@ -82,30 +82,56 @@ async function obterAccessTokenDriveCompartilhado() {
  * Drive, e devolve o ID dessa pasta. Os IDs ficam guardados no Firestore
  * pra não precisar procurar no Drive toda vez.
  */
+// Evita criar a mesma pasta duas vezes quando várias correções rodam
+// em paralelo (ex: 6 documentos ao mesmo tempo, todos precisando da
+// pasta "processosPessoal" pela primeira vez) — a primeira chamada
+// "reserva" a promessa aqui; as concorrentes esperam essa mesma
+// promessa em vez de cada uma criar sua própria pasta.
+const promessasCriacaoPastaModulo = {};
+
 async function obterOuCriarPastaModulo(nomeModulo) {
-  const refEntidade = db.collection("entidades").doc(estado.entidadeAtual);
-  const doc = await refEntidade.get();
-  const dados = doc.data();
-  const pastasDrive = dados.pastasDrive || {};
+  const chaveCache = `${estado.entidadeAtual}_${nomeModulo}`;
 
-  if (pastasDrive[nomeModulo]) {
-    return pastasDrive[nomeModulo];
+  // Já tem uma criação em andamento (de outra tarefa concorrente) —
+  // espera o resultado dela em vez de começar outra.
+  if (promessasCriacaoPastaModulo[chaveCache]) {
+    return promessasCriacaoPastaModulo[chaveCache];
   }
 
-  const token = await obterAccessTokenDrive();
+  const promessa = (async () => {
+    const refEntidade = db.collection("entidades").doc(estado.entidadeAtual);
+    const doc = await refEntidade.get();
+    const dados = doc.data();
+    const pastasDrive = dados.pastasDrive || {};
 
-  // Cria a pasta raiz da entidade, se ainda não existir
-  let pastaRaizId = pastasDrive._raiz;
-  if (!pastaRaizId) {
-    pastaRaizId = await criarPastaDrive(token, `SOFT+ Indexação - ${dados.nome}`, null);
-    pastasDrive._raiz = pastaRaizId;
+    if (pastasDrive[nomeModulo]) {
+      return pastasDrive[nomeModulo];
+    }
+
+    const token = await obterAccessTokenDrive();
+
+    // Cria a pasta raiz da entidade, se ainda não existir
+    let pastaRaizId = pastasDrive._raiz;
+    if (!pastaRaizId) {
+      pastaRaizId = await criarPastaDrive(token, `SOFT+ Indexação - ${dados.nome}`, null);
+      pastasDrive._raiz = pastaRaizId;
+    }
+
+    const pastaModuloId = await criarPastaDrive(token, nomeModulo, pastaRaizId);
+    pastasDrive[nomeModulo] = pastaModuloId;
+
+    await refEntidade.update({ pastasDrive });
+    return pastaModuloId;
+  })();
+
+  promessasCriacaoPastaModulo[chaveCache] = promessa;
+  try {
+    return await promessa;
+  } finally {
+    // Libera o cache depois de resolvida — próximas chamadas (já com a
+    // pasta salva no Firestore) só vão precisar da leitura rápida acima.
+    delete promessasCriacaoPastaModulo[chaveCache];
   }
-
-  const pastaModuloId = await criarPastaDrive(token, nomeModulo, pastaRaizId);
-  pastasDrive[nomeModulo] = pastaModuloId;
-
-  await refEntidade.update({ pastasDrive });
-  return pastaModuloId;
 }
 
 async function criarPastaDrive(token, nome, pastaPaiId) {
@@ -115,7 +141,7 @@ async function criarPastaDrive(token, nome, pastaPaiId) {
   };
   if (pastaPaiId) metadados.parents = [pastaPaiId];
 
-  const resposta = await fetch("https://www.googleapis.com/drive/v3/files", {
+  const resposta = await fetch("https://www.googleapis.com/drive/v3/files?supportsAllDrives=true", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -132,13 +158,26 @@ async function criarPastaDrive(token, nome, pastaPaiId) {
  * Envia um arquivo PDF pro Drive, dentro da pasta do módulo indicado.
  * Devolve { driveFileId, nomeArquivo, tamanhoBytes, paginas }
  */
-async function enviarPdfParaDrive(arquivo, nomeModulo, aoProgredir) {
-  if (arquivo.type !== "application/pdf") {
+async function enviarPdfParaDrive(arquivo, nomeModulo, aoProgredir, opcoes = {}) {
+  const ehPdf = arquivo.type === "application/pdf";
+  if (!ehPdf && !opcoes.permitirQualquerTipo) {
     throw new Error("Só é permitido anexar arquivos em PDF.");
   }
 
   aoProgredir?.("Lendo o documento...");
-  const paginas = await contarPaginasPdf(arquivo);
+  let paginas = null;
+  if (ehPdf) {
+    try {
+      paginas = await contarPaginasPdf(arquivo);
+    } catch (erro) {
+      // O arquivo está marcado como PDF, mas o conteúdo não é um PDF
+      // de verdade (comum em anexos antigos migrados, onde às vezes é
+      // na real uma foto/imagem) — não trava o envio por causa disso,
+      // só segue sem a contagem de página.
+      console.warn(`Não foi possível contar páginas de "${arquivo.name}" (conteúdo pode não ser um PDF válido):`, erro);
+      paginas = null;
+    }
+  }
 
   aoProgredir?.("Conectando ao Google Drive...");
   const token = await obterAccessTokenDrive();
@@ -149,13 +188,14 @@ async function enviarPdfParaDrive(arquivo, nomeModulo, aoProgredir) {
     parents: [pastaId],
   };
 
+  const tipoReal = arquivo.type || "application/pdf";
   const limite = "-------soft-plus-boundary-------";
   const corpo =
     `--${limite}\r\n` +
     `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
     `${JSON.stringify(metadados)}\r\n` +
     `--${limite}\r\n` +
-    `Content-Type: application/pdf\r\n\r\n`;
+    `Content-Type: ${tipoReal}\r\n\r\n`;
 
   const bytesArquivo = await arquivo.arrayBuffer();
   const rodape = `\r\n--${limite}--`;
@@ -164,7 +204,7 @@ async function enviarPdfParaDrive(arquivo, nomeModulo, aoProgredir) {
 
   aoProgredir?.("Enviando arquivo...", 0);
   const dados = await enviarComProgresso(
-    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id",
+    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id&supportsAllDrives=true",
     {
       Authorization: `Bearer ${token}`,
       "Content-Type": `multipart/related; boundary=${limite}`,
@@ -257,7 +297,7 @@ function baixarComProgresso(url, token, aoProgresso) {
 async function visualizarAnexo(driveFileId, aoProgredir) {
   const token = await obterAccessTokenDrive();
   const blob = await baixarComProgresso(
-    `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`,
+    `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media&supportsAllDrives=true`,
     token,
     aoProgredir
   );
@@ -269,7 +309,7 @@ async function visualizarAnexo(driveFileId, aoProgredir) {
 async function baixarAnexo(driveFileId, nomeArquivo, aoProgredir) {
   const token = await obterAccessTokenDrive();
   const blob = await baixarComProgresso(
-    `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`,
+    `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media&supportsAllDrives=true`,
     token,
     aoProgredir
   );
@@ -284,7 +324,7 @@ async function baixarAnexo(driveFileId, nomeArquivo, aoProgredir) {
 /** Exclui o arquivo do Drive (usado quando um anexo é removido de um registro) */
 async function excluirAnexoDrive(driveFileId) {
   const token = await obterAccessTokenDrive();
-  await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}`, {
+  await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?supportsAllDrives=true`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -314,7 +354,7 @@ async function exportarAnexosComoZip(listaDeAnexos, nomeArquivoZip, aoProgredir)
     let blob;
     try {
       blob = await baixarComProgresso(
-        `https://www.googleapis.com/drive/v3/files/${anexo.driveFileId}?alt=media`,
+        `https://www.googleapis.com/drive/v3/files/${anexo.driveFileId}?alt=media&supportsAllDrives=true`,
         token,
         (percentualArquivo) => {
           // Progresso geral = arquivos já concluídos + fração do atual

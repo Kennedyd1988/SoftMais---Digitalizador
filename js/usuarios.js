@@ -7,6 +7,10 @@ const ABAS_PERMISSIVEIS = [
   { chave: "despesas", rotulo: "Processos de Despesa" },
   { chave: "legislacao", rotulo: "Legislação" },
   { chave: "documentosDiversos", rotulo: "Documentos Diversos" },
+  { chave: "servidores", rotulo: "Servidores" },
+  { chave: "folhas", rotulo: "Folhas" },
+  { chave: "processosPessoal", rotulo: "Processos de Pessoal" },
+  { chave: "atosAdministrativos", rotulo: "Atos Administrativos" },
   { chave: "relatorios", rotulo: "Relatórios" },
 ];
 
@@ -166,12 +170,34 @@ async function renderizarUnidadesGestoras(area) {
       refreshTokenAtual = docConfig.exists ? docConfig.data().refreshToken || "" : "";
     }
 
-    criarModal(`${registro ? "Editar" : "Nova"} Unidade Gestora`, `
+    const modal = criarModal(`${registro ? "Editar" : "Nova"} Unidade Gestora`, `
       <label>Nome *</label>
       <input type="text" id="campo-nome" value="${registro?.nome || ""}">
       <label>CNPJ</label>
       <input type="text" id="campo-cnpj" value="${registro?.cnpj || ""}">
-      <label>Refresh Token do Google Drive (opcional)</label>
+      <label>Endereço</label>
+      <input type="text" id="campo-endereco" value="${registro?.endereco || ""}" placeholder="Rua, número, bairro, cidade/UF, CEP">
+      <div class="linha-formulario">
+        <div>
+          <label>Telefone</label>
+          <input type="text" id="campo-telefone" value="${registro?.telefone || ""}">
+        </div>
+        <div>
+          <label>E-mail</label>
+          <input type="email" id="campo-email" value="${registro?.email || ""}">
+        </div>
+      </div>
+      <label>Responsável (nome e cargo)</label>
+      <input type="text" id="campo-responsavel" value="${registro?.responsavel || ""}" placeholder="Ex: Fulano de Tal — Prefeito Municipal">
+
+      <label>Logo (aparece no cabeçalho dos relatórios em PDF)</label>
+      <div style="display:flex; align-items:center; gap:12px; margin-top:4px">
+        <img id="preview-logo" src="${registro?.logoBase64 || ""}" style="max-width:120px; max-height:60px; ${registro?.logoBase64 ? "" : "display:none"}; border:1px solid var(--cinza-borda); border-radius:6px; padding:4px">
+        <input type="file" id="campo-logo" accept="image/*">
+      </div>
+      <input type="hidden" id="campo-logo-base64" value="${registro?.logoBase64 || ""}">
+
+      <label style="margin-top:14px">Refresh Token do Google Drive (opcional)</label>
       <input type="text" id="campo-drive-refresh-token" value="${refreshTokenAtual}" placeholder="Deixe em branco pra usar a conta compartilhada padrão">
       <p class="texto-secundario" style="margin-top:4px">
         Só preencha se esta unidade gestora tiver sua PRÓPRIA conta do
@@ -186,7 +212,15 @@ async function renderizarUnidadesGestoras(area) {
       if (!nome) { marcarCampoInvalido(campoNome, "Informe o nome."); return; }
 
       await executarComFeedback(botaoSalvar, async () => {
-        const dados = { nome, cnpj: document.getElementById("campo-cnpj").value.trim() };
+        const dados = {
+          nome,
+          cnpj: document.getElementById("campo-cnpj").value.trim(),
+          endereco: document.getElementById("campo-endereco").value.trim(),
+          telefone: document.getElementById("campo-telefone").value.trim(),
+          email: document.getElementById("campo-email").value.trim(),
+          responsavel: document.getElementById("campo-responsavel").value.trim(),
+          logoBase64: document.getElementById("campo-logo-base64").value || null,
+        };
         let entidadeId = registro?.id;
         if (registro) {
           await db.collection("entidades").doc(registro.id).update(dados);
@@ -214,6 +248,20 @@ async function renderizarUnidadesGestoras(area) {
         mostrarToast("Unidade gestora salva com sucesso.", "sucesso");
         carregarLista();
       });
+    });
+
+    modal.querySelector("#campo-logo").addEventListener("change", async (evento) => {
+      const arquivo = evento.target.files[0];
+      if (!arquivo) return;
+      try {
+        const base64 = await redimensionarImagemParaBase64(arquivo, 300);
+        modal.querySelector("#campo-logo-base64").value = base64;
+        const preview = modal.querySelector("#preview-logo");
+        preview.src = base64;
+        preview.style.display = "";
+      } catch (erro) {
+        mostrarToast(erro.message, "erro");
+      }
     });
   }
 

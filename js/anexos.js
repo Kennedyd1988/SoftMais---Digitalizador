@@ -126,7 +126,7 @@ function renderizarSecaoAnexos(container, anexosIniciais, nomeModulo, aoMudar, o
           linha.className = "linha-anexo-wrapper";
           linha.innerHTML = `
             <div class="linha-anexo">
-              <span class="nome-anexo">📄 ${anexo.nomeArquivo} <span class="texto-secundario">(${anexo.paginas} pág. · ${formatarTamanhoArquivo(anexo.tamanhoBytes)})</span></span>
+              <span class="nome-anexo">📄 ${anexo.nomeArquivo} <span class="texto-secundario">(${anexo.paginas ?? "?"} pág. · ${formatarTamanhoArquivo(anexo.tamanhoBytes)})</span></span>
               <div class="acoes-anexo">
                 <button type="button" class="botao-icone" title="Visualizar" data-acao="ver">👁️</button>
                 <button type="button" class="botao-icone" title="Baixar" data-acao="baixar">⬇️</button>

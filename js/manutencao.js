@@ -18,6 +18,78 @@ async function renderizarManutencao(area) {
     </p>
 
     <div class="cartao-manutencao">
+      <h3>🔧 Corrigir Anexos Migrados do AppSheet</h3>
+      <p class="texto-secundario">
+        Os anexos trazidos pela migração do AppSheet apontam pro arquivo
+        <strong>original</strong>, que o app não criou — por isso, depois
+        de trocar o Refresh Token de volta pra um com permissão normal
+        (drive.file), eles param de abrir ("Não foi possível baixar o
+        documento"). Esta ferramenta baixa cada anexo migrado e reenvia
+        pra dentro da estrutura própria do app — a partir daí, o arquivo
+        passa a ser "do app" de vez, e continua funcionando mesmo com o
+        Refresh Token normal.
+        <strong>Precisa rodar com um Refresh Token que ainda tenha
+        drive.readonly</strong> (o mesmo usado na migração) — se você já
+        trocou pro definitivo, configure o de leitura ampla de novo por
+        enquanto (Unidades Gestoras), roda esta correção, e só depois
+        volte pro definitivo.
+      </p>
+      <p class="texto-secundario" id="rc-total-documentos">Já processa vários arquivos ao mesmo tempo (mais rápido). Se quiser dividir o trabalho entre várias abas do navegador pra ir ainda mais rápido, preencha uma faixa diferente em cada aba (ex: aba 1 = 1 até 500, aba 2 = 501 até 1000...) — clique em "Ver quantos registros tem" pra saber o total.</p>
+      <div class="linha-formulario">
+        <div><label>Registro nº (início)</label><input type="number" id="rc-faixa-inicio" placeholder="Deixe em branco = 1" min="1"></div>
+        <div><label>até o registro nº (fim)</label><input type="number" id="rc-faixa-fim" placeholder="Deixe em branco = até o final" min="1"></div>
+      </div>
+      <button class="botao-secundario" id="btn-ver-total-documentos" style="margin-top:8px">Ver quantos registros tem</button>
+      <button class="botao-primario" id="btn-corrigir-anexos-migrados">Corrigir Anexos</button>
+      <div id="resultado-correcao-anexos" class="resultado-manutencao"></div>
+    </div>
+
+    <div class="cartao-manutencao">
+      <h3>🔍 Varredura Final — Conferir Migração Completa</h3>
+      <p class="texto-secundario">
+        Faz upload do mesmo <code>pacote_completo.json</code> usado na
+        migração e confere, anexo por anexo, se está tudo certo: se o
+        registro existe, se o anexo está lá, e se o arquivo do Drive
+        realmente abre (não é só olhar se tem um ID salvo). Não altera
+        nada — só gera um relatório do que ainda falta, se sobrar algo.
+      </p>
+      <input type="file" id="input-arquivo-varredura" accept=".json" style="margin-bottom:10px">
+      <br>
+      <button class="botao-primario" id="btn-rodar-varredura">Rodar Varredura</button>
+      <div id="resultado-varredura" class="resultado-manutencao"></div>
+    </div>
+
+    <div class="cartao-manutencao">
+      <h3>🧹 Reorganizar Pastas Duplicadas</h3>
+      <p class="texto-secundario">
+        Se a correção em paralelo criou pastas repetidas no Drive (ex:
+        várias pastas "processosPessoal"), esta ferramenta acha as
+        duplicatas, move os arquivos delas pra pasta oficial (a que
+        está registrada), e exclui as que sobrarem vazias. Só move —
+        nunca baixa nem reenvia o conteúdo do PDF, então é rápido mesmo
+        com muitos arquivos.
+      </p>
+      <button class="botao-primario" id="btn-reorganizar-pastas">Reorganizar Pastas</button>
+      <div id="resultado-reorganizar-pastas" class="resultado-manutencao"></div>
+    </div>
+
+    <div class="cartao-manutencao">
+      <h3>🚀 Importar Migração AppSheet</h3>
+      <p class="texto-secundario">
+        Faz upload do pacote <code>.json</code> já preparado (planilha do
+        AppSheet processada) e importa tudo: cadastros de apoio, os
+        registros de Licitações/Pessoal/Atos Administrativos/Despesas, e
+        busca cada anexo pelo nome nas pastas do Drive já vinculado a esta
+        unidade gestora. Pode rodar mais de uma vez com segurança — o que
+        já foi migrado antes é reconhecido e pulado, não duplica.
+      </p>
+      <input type="file" id="input-arquivo-migracao" accept=".json" style="margin-bottom:10px">
+      <br>
+      <button class="botao-primario" id="btn-rodar-migracao">Iniciar Migração</button>
+      <div id="resultado-migracao" class="resultado-manutencao"></div>
+    </div>
+
+    <div class="cartao-manutencao">
       <h3>Reindexar campos de busca — Processos de Despesa</h3>
       <p class="texto-secundario">
         Preenche os campos internos usados na busca (número do empenho,
@@ -133,6 +205,209 @@ async function renderizarManutencao(area) {
   `;
 
   configurarAtualizacaoEmMassa();
+
+  document.getElementById("btn-ver-total-documentos").addEventListener("click", async (evento) => {
+    await executarComFeedback(evento.target, async () => {
+      const lista = await listarDocumentosMigradosComAnexo();
+      document.getElementById("rc-total-documentos").textContent =
+        `${lista.length} registro(s) migrado(s) com anexo, no total. Divida esse número entre as abas que for abrir (ex: 4 abas de ~${Math.ceil(lista.length / 4)} cada).`;
+    }, "Contando...");
+  });
+
+  document.getElementById("btn-corrigir-anexos-migrados").addEventListener("click", async (evento) => {
+    const inicio = parseInt(document.getElementById("rc-faixa-inicio").value, 10) || null;
+    const fim = parseInt(document.getElementById("rc-faixa-fim").value, 10) || null;
+    const faixa = (inicio || fim) ? { inicio, fim } : null;
+    const avisoFaixa = faixa ? ` (só a faixa ${inicio || 1} até ${fim || "o final"})` : "";
+
+    if (!confirm(`Isso vai baixar cada anexo migrado do AppSheet${avisoFaixa} e reenviar pra dentro da estrutura do app — precisa de um Refresh Token com drive.readonly ativo nesta unidade gestora. Pode demorar bastante. Continuar?`)) return;
+
+    const resultadoEl = document.getElementById("resultado-correcao-anexos");
+    const barra = criarBarraProgressoInline(resultadoEl, "Corrigindo anexos");
+
+    await executarComFeedback(evento.target, async () => {
+      try {
+        const resultado = await corrigirAnexosMigrados((feitos, total) => barra.atualizar(feitos, total, "Corrigindo anexos"), faixa);
+        barra.remover();
+        if (resultado.totalAnexos === 0) {
+          resultadoEl.innerHTML = `<p>Nenhum anexo migrado encontrado pra corrigir${avisoFaixa}.</p>`;
+          return;
+        }
+        resultadoEl.innerHTML = `
+          <p>✅ ${resultado.corrigidos} corrigido(s) agora${resultado.jaEstavamCorretos > 0 ? ` + ${resultado.jaEstavamCorretos} já estavam corretos de antes` : ""} — de ${resultado.totalAnexos} anexo(s)${avisoFaixa ? " nessa faixa" : " migrado(s) ao todo"}.</p>
+          <p class="texto-secundario">Total geral de registros migrados com anexo: ${resultado.totalDocumentosNaColecao}.</p>
+          ${
+            resultado.falhas.length > 0
+              ? `<p>⚠️ ${resultado.falhas.length} anexo(s) não puderam ser corrigidos agora (provavelmente o token não tem mais drive.readonly):</p>
+                 <div class="lista-erros-importacao">${resultado.falhas.map((f) => `<div>${f}</div>`).join("")}</div>`
+              : ""
+          }
+        `;
+        mostrarToast("Correção de anexos concluída.", "sucesso");
+      } catch (erro) {
+        barra.remover();
+        resultadoEl.innerHTML = `<p style="color:var(--vermelho-erro)">❌ ${erro.message}</p>`;
+      }
+    }, "Corrigindo...");
+  });
+
+  document.getElementById("btn-rodar-migracao").addEventListener("click", async (evento) => {
+    const arquivoInput = document.getElementById("input-arquivo-migracao");
+    const resultadoEl = document.getElementById("resultado-migracao");
+    if (!arquivoInput.files[0]) {
+      mostrarToast("Selecione o arquivo .json antes de iniciar.", "erro");
+      return;
+    }
+
+    let pacote;
+    try {
+      const texto = await arquivoInput.files[0].text();
+      pacote = JSON.parse(texto);
+    } catch (erro) {
+      mostrarToast("Não foi possível ler esse arquivo — confira se é o .json certo.", "erro");
+      return;
+    }
+
+    const totalRegistros = ["licitacoes", "processosPessoal", "atosAdministrativos", "processosDespesa"]
+      .reduce((soma, k) => soma + (pacote[k]?.length || 0), 0);
+
+    if (!confirm(`Isso vai importar até ${totalRegistros} registro(s) (e buscar os anexos deles no Drive) pra unidade gestora atual (${estado.entidadeAtualNome}). Pode demorar bastante — não feche a aba no meio. Confirma que é a unidade gestora certa e quer continuar?`)) return;
+
+    const barra = criarBarraProgressoInline(resultadoEl, "Migrando");
+
+    await executarComFeedback(evento.target, async () => {
+      try {
+        const relatorio = await executarMigracaoAppSheet(pacote, (etapa, feitos, total) => {
+          barra.atualizar(feitos, total, etapa);
+        });
+        barra.remover();
+
+        const linhasCadastros = Object.entries(relatorio.cadastros)
+          .map(([col, r]) => `<div>${col}: ${r.criados} criado(s) de ${r.total}</div>`).join("");
+        const linhasRegistros = Object.entries(relatorio.registros)
+          .map(([col, r]) => `<div>${col}: ${r.criados} criado(s), ${r.atualizados || 0} atualizado(s) com anexo novo, ${r.pulados} já estava(m) completo(s) — de ${r.total}</div>`).join("");
+
+        resultadoEl.innerHTML = `
+          <p>✅ Migração concluída.</p>
+          <p><strong>Cadastros de apoio</strong></p>
+          ${linhasCadastros}
+          <p style="margin-top:8px"><strong>Registros</strong></p>
+          ${linhasRegistros}
+          <p style="margin-top:8px">📎 Anexos encontrados no Drive e vinculados: ${relatorio.anexosEncontrados}</p>
+          ${
+            relatorio.anexosNaoEncontrados.length > 0
+              ? `<p>⚠️ ${relatorio.anexosNaoEncontrados.length} anexo(s) NÃO encontrado(s) no Drive (registro criado sem esse anexo específico):</p>
+                 <div class="lista-erros-importacao">${relatorio.anexosNaoEncontrados.map((a) => `<div>${a}</div>`).join("")}</div>`
+              : ""
+          }
+        `;
+        mostrarToast("Migração concluída — confira o resultado abaixo.", "sucesso");
+      } catch (erro) {
+        barra.remover();
+        console.error(erro);
+        resultadoEl.innerHTML = `<p style="color:var(--vermelho-erro)">❌ Erro durante a migração: ${erro.message}</p><p class="texto-secundario">Pode rodar de novo com segurança — o que já foi criado não duplica.</p>`;
+      }
+    }, "Migrando...");
+  });
+
+  document.getElementById("btn-rodar-varredura").addEventListener("click", async (evento) => {
+    const arquivoInput = document.getElementById("input-arquivo-varredura");
+    const resultadoEl = document.getElementById("resultado-varredura");
+    if (!arquivoInput.files[0]) {
+      mostrarToast("Selecione o arquivo .json antes de rodar a varredura.", "erro");
+      return;
+    }
+
+    let pacote;
+    try {
+      const texto = await arquivoInput.files[0].text();
+      pacote = JSON.parse(texto);
+    } catch (erro) {
+      mostrarToast("Não foi possível ler esse arquivo — confira se é o .json certo.", "erro");
+      return;
+    }
+
+    const barra = criarBarraProgressoInline(resultadoEl, "Conferindo");
+
+    await executarComFeedback(evento.target, async () => {
+      try {
+        const relatorio = await rodarVarreduraFinal(pacote, (feitos, total) => barra.atualizar(feitos, total, "Conferindo"));
+        barra.remover();
+
+        const tudoCerto = relatorio.registrosFaltando.length === 0
+          && relatorio.anexosFaltando.length === 0
+          && relatorio.anexosComArquivoQuebrado.length === 0
+          && relatorio.anexosAindaNaoCorrigidos.length === 0;
+
+        resultadoEl.innerHTML = `
+          <p>${tudoCerto ? "✅ Tudo certo!" : "⚠️ Encontrei pendências"} — ${relatorio.totalRegistrosConferidos} registro(s) e ${relatorio.totalAnexosConferidos} anexo(s) conferidos.</p>
+          ${
+            relatorio.registrosFaltando.length > 0
+              ? `<p><strong>${relatorio.registrosFaltando.length} registro(s) que ainda não existem no app:</strong></p>
+                 <div class="lista-erros-importacao">${relatorio.registrosFaltando.map((r) => `<div>${r}</div>`).join("")}</div>`
+              : ""
+          }
+          ${
+            relatorio.anexosFaltando.length > 0
+              ? `<p><strong>${relatorio.anexosFaltando.length} anexo(s) que a fonte lista mas não estão no registro:</strong></p>
+                 <div class="lista-erros-importacao">${relatorio.anexosFaltando.map((r) => `<div>${r}</div>`).join("")}</div>`
+              : ""
+          }
+          ${
+            relatorio.anexosComArquivoQuebrado.length > 0
+              ? `<p><strong>${relatorio.anexosComArquivoQuebrado.length} anexo(s) presentes, mas o arquivo do Drive não abre:</strong></p>
+                 <div class="lista-erros-importacao">${relatorio.anexosComArquivoQuebrado.map((r) => `<div>${r}</div>`).join("")}</div>`
+              : ""
+          }
+          ${
+            relatorio.anexosAindaNaoCorrigidos.length > 0
+              ? `<p><strong>⚠️ ${relatorio.anexosAindaNaoCorrigidos.length} anexo(s) ainda apontam pro arquivo ORIGINAL do AppSheet</strong> — funcionam agora (porque o token de leitura ampla ainda está ativo), mas vão QUEBRAR assim que você voltar pro Refresh Token definitivo. Rode "Corrigir Anexos" antes de trocar o token:</p>
+                 <div class="lista-erros-importacao">${relatorio.anexosAindaNaoCorrigidos.map((r) => `<div>${r}</div>`).join("")}</div>`
+              : ""
+          }
+        `;
+        mostrarToast(tudoCerto ? "Varredura concluída — tudo certo!" : "Varredura concluída — veja as pendências.", tudoCerto ? "sucesso" : "erro");
+      } catch (erro) {
+        barra.remover();
+        console.error(erro);
+        resultadoEl.innerHTML = `<p style="color:var(--vermelho-erro)">❌ Erro durante a varredura: ${erro.message}</p>`;
+      }
+    }, "Conferindo...");
+  });
+
+  document.getElementById("btn-reorganizar-pastas").addEventListener("click", async (evento) => {
+    if (!confirm("Isso vai procurar pastas de módulo duplicadas no Drive, mover os arquivos delas pra pasta oficial e excluir as que sobrarem vazias. Não mexe no Firestore, só organiza o Drive. Continuar?")) return;
+
+    const resultadoEl = document.getElementById("resultado-reorganizar-pastas");
+    const barra = criarBarraProgressoInline(resultadoEl, "Reorganizando");
+
+    await executarComFeedback(evento.target, async () => {
+      try {
+        const resultado = await reorganizarPastasDuplicadas((feitos, total) => barra.atualizar(feitos, total, "Reorganizando"));
+        barra.remover();
+        if (resultado.pastasDuplicadasEncontradas === 0) {
+          resultadoEl.innerHTML = `<p>✅ Nenhuma pasta duplicada encontrada — já está tudo organizado.</p>`;
+          return;
+        }
+        resultadoEl.innerHTML = `
+          <p>✅ ${resultado.pastasDuplicadasEncontradas} pasta(s) duplicada(s) encontrada(s).</p>
+          <p>${resultado.arquivosMovidos} arquivo(s) movido(s) pra pasta oficial.</p>
+          <p>${resultado.pastasExcluidas} pasta(s) vazia(s) excluída(s).</p>
+          ${
+            resultado.falhas.length > 0
+              ? `<p>⚠️ ${resultado.falhas.length} problema(s):</p>
+                 <div class="lista-erros-importacao">${resultado.falhas.map((f) => `<div>${f}</div>`).join("")}</div>`
+              : ""
+          }
+        `;
+        mostrarToast("Reorganização concluída.", "sucesso");
+      } catch (erro) {
+        barra.remover();
+        console.error(erro);
+        resultadoEl.innerHTML = `<p style="color:var(--vermelho-erro)">❌ ${erro.message}</p>`;
+      }
+    }, "Reorganizando...");
+  });
 
   document.getElementById("btn-migrar-drive").addEventListener("click", async (evento) => {
     if (!confirm("Isso vai baixar cada anexo antigo da conta compartilhada e reenviar pra conta própria desta unidade gestora. Pode demorar bastante e não pode ser interrompido no meio sem risco de ficar incompleto. Continuar?")) return;
@@ -449,16 +724,16 @@ async function migrarAnexosParaDriveProprio(aoProgredir) {
 
       for (const anexo of documento.dados.anexos) {
         try {
-          const resposta = await fetch(`https://www.googleapis.com/drive/v3/files/${anexo.driveFileId}?alt=media`, {
+          const resposta = await fetch(`https://www.googleapis.com/drive/v3/files/${anexo.driveFileId}?alt=media&supportsAllDrives=true`, {
             headers: { Authorization: `Bearer ${tokenContaAntiga}` },
           });
           if (!resposta.ok) throw new Error("Não foi possível baixar da conta antiga.");
           const blob = await resposta.blob();
-          const arquivo = new File([blob], anexo.nomeArquivo, { type: "application/pdf" });
+          const arquivo = new File([blob], anexo.nomeArquivo, { type: detectarTipoPorExtensao(anexo.nomeArquivo) });
 
           // Reenvia usando o token da unidade gestora atual — que já é
           // a conta própria, já que ela tem Refresh Token configurado.
-          const novoAnexo = await enviarPdfParaDrive(arquivo, colecao, () => {});
+          const novoAnexo = await enviarPdfParaDrive(arquivo, colecao, () => {}, { permitirQualquerTipo: true });
           novoAnexo.volume = anexo.volume;
           novoAnexo.dataUpload = anexo.dataUpload || new Date().toISOString();
           novoAnexo.usuarioUpload = anexo.usuarioUpload || estado.usuario.email;

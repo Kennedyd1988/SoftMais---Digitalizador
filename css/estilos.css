@@ -272,6 +272,16 @@ input:focus, select:focus, textarea:focus {
 .rotulo-resumo { font-size: 13px; color: var(--cinza-texto); margin-top: 4px; }
 .cartao-atencao { transition: box-shadow 0.15s; }
 .cartao-atencao:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-color: var(--azul-principal); }
+.lista-entidades-selecao { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; max-height: 400px; overflow-y: auto; }
+.item-selecao-entidade {
+  display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+  border: 1px solid var(--cinza-borda); border-radius: var(--raio, 10px);
+  background: var(--branco); cursor: pointer; font-size: 15px; text-align: left;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+.item-selecao-entidade:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-color: var(--azul-principal); }
+.item-selecao-entidade img { max-width: 40px; max-height: 40px; object-fit: contain; }
+.icone-entidade-generico { font-size: 24px; }
 .tabela-relatorio { width: 100%; border-collapse: collapse; margin-bottom: 24px; background: var(--branco); border: 1px solid var(--cinza-borda); border-radius: var(--raio, 10px); overflow: hidden; }
 .tabela-relatorio th, .tabela-relatorio td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--cinza-borda); font-size: 13px; }
 .tabela-relatorio th:nth-child(2), .tabela-relatorio th:nth-child(3),

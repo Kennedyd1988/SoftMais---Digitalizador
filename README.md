@@ -210,6 +210,268 @@ está tudo certo.
 
 ## Changelog
 
+**v7.16** — Corrigido bug real (provável causa da confusão "migração diz
+que já existe, varredura diz que não existe"): as consultas que checam
+"esse registro já existe?" podiam estar lendo do **cache local** do
+Firestore no navegador, em vez de ir direto no servidor — se um
+registro tinha acabado de ser criado, a leitura em cache podia não
+"enxergar" ele ainda. Todas as consultas de checagem (migração,
+correção de anexos, varredura) agora forçam `source: "server"`, sempre
+lendo o dado mais atual, sem depender do cache.
+
+**v7.15** — Busca de anexo no Drive ficou mais resistente a nomes de
+arquivo bagunçados (erro de digitação, espaço a mais, etc., comum em
+dados antigos): se a busca pelo nome exato não achar nada, tenta de
+novo só pelo **código único no começo do nome** (ex: "74f29716" em
+"74f29716.IMAGENS.231715...pdf") — esse código nunca tem erro de
+digitação, já que é gerado automaticamente, diferente do resto do nome
+que às vezes foi digitado à mão.
+
+**v7.14** — Corrigido erro "Invalid PDF structure" na correção de
+anexos: alguns arquivos migrados do AppSheet são na real **fotos
+(.jpg)**, não PDFs escaneados — mas a migração tratava tudo como PDF
+(inclusive tentando contar páginas com uma ferramenta de PDF), travando
+nesses casos. Agora: 1) o tipo do arquivo é detectado pela extensão do
+nome (`.jpg`/`.png` viram imagem de verdade, não PDF fingido); 2) se
+mesmo assim a contagem de página falhar (conteúdo não é um PDF válido),
+o envio não trava mais por causa disso — só segue sem contar página. Os
+31 anexos que falharam com esse erro devem ser corrigidos rodando a
+ferramenta de novo.
+
+**v7.13** — Nova ferramenta em Manutenção: **🧹 Reorganizar Pastas
+Duplicadas**. Acha pastas de módulo repetidas dentro da pasta raiz da
+unidade gestora (criadas por engano antes da correção da v7.12), move
+os arquivos delas pra pasta oficial (a que está registrada no
+Firestore) e exclui as que sobrarem vazias. Só faz operação de mover
+(metadado), nunca baixa/reenvia o conteúdo do PDF — por isso é rápido
+mesmo com muitos arquivos, bem diferente do tempo que a correção normal
+leva.
+
+**v7.12** — Corrigido bug real causado pela paralelização (introduzida
+na v7.9): quando várias correções de anexo rodavam ao mesmo tempo e
+era a primeira vez que uma pasta de módulo (ex: "processosPessoal")
+precisava ser criada no Drive, cada tarefa concorrente checava "já
+existe?" antes de qualquer uma salvar a resposta, e todas criavam sua
+própria pasta — resultando em pastas duplicadas (uma "vencia" e ficava
+registrada, as outras ficavam órfãs com arquivos dentro). Não é perda
+de dado (os PDFs continuam corretamente vinculados aos registros,
+só espalhados em pastas demais) — mas ficava bagunçado. Corrigido com
+uma trava na memória do navegador: a primeira chamada "reserva" a
+criação, as concorrentes esperam o resultado dela em vez de criar a
+própria. **Pastas duplicadas já criadas antes desta correção** podem
+ser organizadas manualmente no Drive (arrastar os arquivos pra uma só
+e excluir as vazias) — é só uma questão de organização, não afeta o
+funcionamento do app.
+
+**v7.11** — Fechado um furo real na "🔍 Varredura Final": ela conferia
+se o arquivo "existe" no Drive agora, mas não conferia se já era uma
+cópia "do app" (corrigida) ou ainda o arquivo **original** do AppSheet
+— um anexo assim passaria como "tudo certo" enquanto o Refresh Token de
+leitura ampla estivesse ativo, mas quebraria de novo assim que voltasse
+pro token definitivo. Agora a varredura mostra uma categoria separada
+pra isso ("ainda aponta pro arquivo original — vai quebrar depois"),
+avisando claramente que é preciso rodar "Corrigir Anexos" antes de
+considerar a migração pronta pra valer.
+
+**v7.10** — Corrigido risco real de desperdício em caso de queda de
+conexão: a ferramenta "🔧 Corrigir Anexos Migrados" gravava no Firestore
+só depois que **todos** os anexos de um registro terminavam — se a
+conexão caísse no meio (ex: registro com 3 anexos, caiu depois do 2º),
+nenhum progresso daquele registro ficava salvo, e a próxima rodada
+reenviava os que já tinham dado certo de novo (cópia duplicada órfã no
+Drive, ocupando espaço à toa). Agora grava **anexo por anexo**, assim
+que cada um termina — uma queda no meio preserva o que já deu certo,
+sem duplicar nada. Importante: um registro **nunca** ficava marcado como
+"pronto" estando incompleto (isso já era seguro antes) — a mudança é só
+sobre não desperdiçar trabalho já feito numa queda de conexão.
+
+**v7.9** — Três melhorias na correção de anexos migrados:
+1. **Interface pra faixa e paralelismo**: o motor já processava vários
+   anexos ao mesmo tempo (mesma aba); agora a tela também tem campos
+   "Registro nº X até Y" — dá pra abrir várias abas, cada uma numa
+   faixa diferente, sem risco de duas abas mexerem no mesmo registro.
+   Um botão "Ver quantos registros tem" ajuda a decidir como dividir.
+2. **Varredura Final** (card novo): sobe o mesmo `pacote_completo.json`
+   de novo e confere, registro por registro e anexo por anexo, se está
+   tudo certo — inclusive testando se o arquivo do Drive realmente abre,
+   não só se tem um ID salvo. Gera um relatório do que ainda falta, sem
+   alterar nada.
+
+**v7.8** — Corrigido um erro secundário no `service-worker.js`: ele
+tentava colocar em cache a chamada `POST` que o app faz pra Cloud
+Function (renovar acesso ao Drive), e isso não é permitido pelo
+navegador ("Request method 'POST' is unsupported"). Agora só tenta
+cachear requisições `GET`. Não afetava o funcionamento (a chamada em si
+sempre funcionou), mas gerava um erro no console à toa.
+
+**v7.7** — Confirmado (direto pelo próprio Google Drive) que alguns IDs
+salvos durante a migração simplesmente não existem — não era falta do
+parâmetro `supportsAllDrives`. A ferramenta "🔧 Corrigir Anexos
+Migrados" agora é mais resistente: sempre tenta primeiro pelo ID
+salvo (mais rápido), e se isso falhar por **qualquer motivo** (ID
+inválido, arquivo excluído, erro de rede), cai automaticamente pra
+buscar o arquivo de novo **pelo nome**, em qualquer uma das pastas do
+AppSheet, antes de desistir. A lista de falhas no resultado final
+também passou a mostrar o motivo específico de cada uma, não só o
+nome do arquivo.
+
+**v7.6** — Corrigido problema real: todas as chamadas à API do Google
+Drive (buscar, baixar, subir, excluir, criar pasta) ganharam o
+parâmetro `supportsAllDrives=true` (e `includeItemsFromAllDrives`/
+`corpora=allDrives` na busca) — sem isso, a API do Drive **ignora
+completamente** arquivos e pastas que estão dentro de uma **Unidade
+Compartilhada** (Shared Drive/Drive de equipe), mesmo com a permissão
+certa. Isso explicava o erro 404 ("arquivo não encontrado") que
+aparecia ao tentar corrigir os anexos migrados, quando os PDFs do
+AppSheet estavam guardados numa Unidade Compartilhada em vez de "Meu
+Drive" comum. Vale rodar a correção de anexos de novo depois de
+atualizar.
+
+**v7.5** — A ferramenta "🔧 Corrigir Anexos Migrados" agora **confere de
+verdade** se o arquivo "já corrigido" ainda existe no Drive antes de
+confiar na marcação — se alguém excluir por engano a pasta nova criada
+pelo app, ela detecta automaticamente e refaz a correção sozinha
+(buscando o arquivo original de novo em qualquer uma das pastas do
+AppSheet, já que o link antigo não serve mais nesse caso). Não precisa
+mais reconstruir nada manualmente — só rodar a ferramenta de novo.
+
+**v7.4** — Corrigido problema real: a ferramenta "🔧 Corrigir Anexos
+Migrados do AppSheet" não sabia quais anexos já tinham sido corrigidos
+numa rodada anterior — se reiniciada no meio, reprocessava tudo de novo
+desde o começo, criando uma **cópia duplicada no Drive** pra cada
+arquivo já corrigido (sem apagar a cópia anterior, virando lixo
+acumulado). Agora cada anexo corrigido grava uma marcação própria
+(`corrigidoAppSheet`), e a ferramenta pula automaticamente quem já tem
+essa marcação — pode interromper e rodar de novo quantas vezes precisar,
+sem duplicar nada e sem desperdiçar tempo reprocessando o que já estava
+certo.
+
+**v7.3** — Corrigido problema real na migração: 675 anexos de Processos
+de Pessoal ficaram de fora da primeira migração — eram volumes extras
+que só apareciam anexados via a tela "Licitações" do sistema antigo
+(pelo mesmo motivo do "hack" de reaproveitar o módulo de Licitações pra
+Pessoal), então não estavam na fonte principal (`img_pessoal`) que a
+migração usava. **O pacote de dados foi regenerado** (`pacote_completo.json`
+novo, entregue junto) já incluindo esses arquivos. A ferramenta de
+importação também foi ajustada: antes, se um registro já tinha pelo
+menos 1 anexo, ela pulava ele inteiro; agora compara **pelo nome de
+cada arquivo** e só busca/adiciona os que realmente estão faltando —
+permite completar registros parcialmente migrados sem duplicar nada.
+**Precisa rodar a importação de novo** com o pacote novo (mesmo
+processo: Manutenção → Importar Migração AppSheet).
+
+**v7.2** — Corrigido problema real: os anexos trazidos pela migração do
+AppSheet apontavam pro arquivo **original** (que o app nunca criou) —
+funcionava enquanto o Refresh Token tinha `drive.readonly`, mas parava
+de abrir ("Não foi possível baixar o documento") assim que trocava pro
+Refresh Token definitivo (só `drive.file`, que só enxerga arquivos que
+o próprio app criou). Nova ferramenta em Manutenção → **🔧 Corrigir
+Anexos Migrados do AppSheet** — baixa cada anexo migrado e reenvia pra
+dentro da estrutura própria do app (de quebra, também preenche a
+contagem de páginas que ficou como "null" na migração). Precisa rodar
+com um Refresh Token que ainda tenha `drive.readonly` — se já trocou
+pro definitivo, configure o de leitura ampla de novo temporariamente
+(mesmo processo de antes), roda essa correção, e só depois volte pro
+definitivo — dessa vez, os arquivos corrigidos continuam funcionando.
+
+**v7.1** — Duas correções importantes:
+- **Dashboard da Início** agora mostra o total de registros **de todos
+  os tempos**, não só do ano atual — corrige o caso de acabar de migrar
+  dados antigos e a tela continuar mostrando "0" porque tudo era de anos
+  anteriores a 2026.
+- **Bug real na busca do campo "Objeto"**: a busca só encontrava o termo
+  se ele estivesse bem no **começo** do texto (limitação do tipo de
+  índice usado) — por isso buscar "COMISSIONADO" não achava nada, já
+  que a palavra aparecia no meio de uma frase longa. Isso não era só um
+  problema dos dados migrados do AppSheet — afetava **qualquer**
+  registro em Licitações, Despesas, Legislação, Documentos Diversos,
+  Processos de Pessoal e Atos Administrativos. Corrigido: a busca por
+  texto livre agora encontra o termo em **qualquer posição** do texto.
+
+**v7.0** — Sete melhorias, por pedido do cliente:
+
+1. **Dashboard da Início**: em vez de valor em R$, mostra só quantidade
+   de processos (igual Licitações já fazia).
+2. **Início considera Pessoal**: Processos de Pessoal e Atos
+   Administrativos entraram no resumo e nos "Pontos de atenção".
+3. **Início respeita permissões**: só mostra os módulos que o usuário
+   logado realmente tem acesso.
+4. **Unidades Gestoras completas**: novos campos (Endereço, Telefone,
+   E-mail, Responsável) e uma **Logo própria** (redimensionada no
+   navegador, sem gastar armazenamento) — tudo isso passa a aparecer no
+   cabeçalho dos relatórios em PDF, no lugar do "SOFT+" genérico de
+   antes.
+5. **Tela de seleção de unidade gestora após o login**: usuários com
+   acesso a mais de uma unidade gestora agora escolhem qual acessar
+   antes de entrar na Início (com a logo de cada uma, se tiver). Quem só
+   tem acesso a uma, entra direto — sem etapa extra.
+6. **Relatório Anual considera Pessoal**: Processos de Pessoal e Atos
+   Administrativos entraram na tabela do Relatório Anual (tela e PDF).
+7. **Relatórios Detalhados** (aba nova): um relatório por módulo
+   (Licitações, Despesas, Legislação, Documentos Diversos, RH), com
+   filtros cruzando tabelas vinculadas — ex: Despesas por Licitação, por
+   Folha, por Credor ou por Unidade Orçamentária. Resultado em tabela na
+   tela, com exportação pra Excel.
+
+**v6.2** — Corrigido bug real na migração: quando um registro já
+existia (por já ter sido criado numa tentativa anterior), a ferramenta
+pulava ele por completo — mesmo que ainda estivesse sem nenhum anexo
+vinculado (por exemplo, se a primeira tentativa falhou em achar os
+arquivos no Drive por causa do escopo de permissão). Agora ela
+distingue "já migrado por completo" de "já criado mas ainda sem anexo"
+— nesse segundo caso, busca os anexos de novo e **atualiza** o registro
+existente, em vez de pular ou duplicar.
+
+**v6.1** — Ferramenta de migração do AppSheet, em Manutenção → **🚀
+Importar Migração AppSheet**. Recebe o pacote `.json` já processado (ver
+`pacote_completo.json` entregue junto), cria os cadastros de apoio que
+faltarem (por nome, sem duplicar se já existirem), busca cada anexo pelo
+nome dentro da pasta certa do Drive (usando o Drive já vinculado a esta
+unidade gestora — sem baixar/reenviar nenhum arquivo, só referencia o
+que já existe lá) e grava os registros. Pode ser rodada mais de uma vez
+com segurança: cada registro migrado guarda um `origemAppSheetId`, e uma
+segunda rodada com dados mais recentes pula automaticamente o que já foi
+trazido antes. **Antes de rodar**: confirme que a unidade gestora
+selecionada no topo do app é a certa, e que o Refresh Token do Drive
+dela já está configurado (Unidades Gestoras) apontando pra conta onde os
+PDFs do AppSheet realmente estão.
+
+**v6.0** — Módulo de RH completo, novo, com paridade total de
+funcionalidades com o resto do app (busca combinável, filtro sem/com
+anexo, seleção em lote, importação/exportação, histórico de alterações):
+
+- **Cadastro Servidores** (nome + matrícula)
+- **Cadastro Folhas** (agrupa vários servidores — ex: "Folha da
+  Educação" — pra vincular numa Despesa de uma vez, sem precisar
+  vincular servidor por servidor)
+- **Cadastro Tipos de Documento de Pessoal** e **Tipos de Ato
+  Administrativo**
+- **Processos de Pessoal**: documento de UM servidor (Tipo, Servidor
+  opcional, Competência mm/aaaa, Exercício, Observações, anexo)
+- **Processos de Ato Administrativo**: documento formal que pode
+  envolver VÁRIOS servidores (Tipo, Número, Exercício, Competência,
+  Data de Emissão, Descrição, Servidores Envolvidos com seleção
+  múltipla, anexo)
+- **Processo de Despesa** ganhou o campo opcional "Folha vinculada" —
+  ao escolher uma Folha, a despesa fica ligada a todos os servidores
+  dela automaticamente
+- **Navegação cruzada em todas as direções**: Servidor → tudo que está
+  vinculado a ele (Processos de Pessoal, Atos Administrativos, Despesas
+  via Folha) num só lugar · Folha → Servidores dela e Despesas
+  vinculadas · Despesa → Servidores da Folha vinculada
+
+Essa estrutura foi desenhada em conjunto com o cliente a partir da
+análise real dos dados do sistema antigo (AppSheet) — ver a conversa
+que originou esta entrega pra entender as decisões de mapeamento dos
+tipos de documento antigos pros dois módulos novos (Pessoal vs Ato
+Administrativo). **A migração dos dados em si (planilha + PDFs do
+Drive) ainda não foi construída** — essa entrega é só a estrutura nova
+do app, pronta pra receber os dados quando a migração for feita, numa
+próxima etapa combinada.
+
+Não foi necessário alterar `firestore.rules` desta vez — as coleções
+novas já caem na regra genérica que já protege as demais.
+
 **v5.2** — Corrigido bug real: ao configurar um Refresh Token novo
 numa unidade gestora que não tinha (ou trocar por outra conta), o app
 mantinha em cache o ID das pastas do Drive criadas na conta ANTIGA

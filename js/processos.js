@@ -165,7 +165,7 @@ function htmlLinhaAnexoSomenteLeitura(anexo) {
   return `
     <div class="linha-anexo-wrapper">
       <div class="linha-anexo">
-        <span class="nome-anexo">📄 ${anexo.nomeArquivo} <span class="texto-secundario">(${anexo.paginas} pág. · ${formatarTamanhoArquivo(anexo.tamanhoBytes)})</span></span>
+        <span class="nome-anexo">📄 ${anexo.nomeArquivo} <span class="texto-secundario">(${anexo.paginas ?? "?"} pág. · ${formatarTamanhoArquivo(anexo.tamanhoBytes)})</span></span>
         <div class="acoes-anexo">
           <button type="button" class="botao-icone" title="Visualizar" data-acao="ver-anexo" data-id="${anexo.driveFileId}" data-nome="${anexo.nomeArquivo}">👁️</button>
           <button type="button" class="botao-icone" title="Baixar" data-acao="baixar-anexo" data-id="${anexo.driveFileId}" data-nome="${anexo.nomeArquivo}">⬇️</button>
@@ -965,24 +965,12 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
     try {
       let registros;
       if (termo) {
-        const termoNormalizado = normalizarTexto(termo);
-        const consultas = ["numeroNormalizado", "objetoNormalizado"].map((campo) =>
-          colecaoEntidade(nomeColecao)
-            .orderBy(campo)
-            .startAt(termoNormalizado)
-            .endAt(termoNormalizado + "\uf8ff")
-            .limit(TAMANHO_PAGINA)
-            .get()
+        registros = await buscarPorSubstringGenerico(
+          nomeColecao,
+          termo,
+          ["numeroNormalizado", "objetoNormalizado"],
+          { campoAno: ano ? "ano" : null, valorAno: ano }
         );
-        const resultadosPorConsulta = await Promise.all(consultas);
-        const encontrados = new Map();
-        resultadosPorConsulta.forEach((snapshot) => {
-          snapshot.docs.forEach((doc) => {
-            if (!encontrados.has(doc.id)) encontrados.set(doc.id, { id: doc.id, ...doc.data() });
-          });
-        });
-        registros = [...encontrados.values()];
-        registros = filtrarPorAnoClientSide(registros, ano);
         registros = filtrarPorAnexoClientSide(registros, filtroAnexo);
       } else if (ano) {
         const snapshot = await colecaoEntidade(nomeColecao).where("ano", "==", parseInt(ano, 10)).get();
@@ -1302,6 +1290,17 @@ async function renderizarDespesas(area) {
           : ""
       }
 
+      <label>Folha vinculada (opcional)</label>
+      <input type="text" id="campo-folha-busca" placeholder="Digite pra buscar uma folha..." value="${registro?.folhaNome || ""}" autocomplete="off">
+      <input type="hidden" id="campo-folha-id" value="${registro?.folhaId || ""}">
+      <div id="resultados-folha" class="lista-autocomplete oculto"></div>
+      <p class="texto-secundario" style="margin-top:4px">Vincular a uma Folha liga esta despesa a todos os servidores dela, sem precisar vincular um por um.</p>
+      ${
+        registro?.folhaId
+          ? `<button type="button" class="botao-secundario botao-link-vinculado" id="btn-ver-servidores-folha">🔗 Ver Servidores da Folha</button>`
+          : ""
+      }
+
       <label>Objeto *</label>
       <textarea id="campo-objeto" rows="3">${registro?.objeto || ""}</textarea>
 
@@ -1372,6 +1371,8 @@ async function renderizarDespesas(area) {
           licitacaoId: campoSemLicitacao.checked ? null : (document.getElementById("campo-licitacao-id").value || null),
           licitacaoIdentificador: campoSemLicitacao.checked ? null : (document.getElementById("campo-licitacao-busca").value.trim() || null),
           semLicitacaoVinculada: campoSemLicitacao.checked,
+          folhaId: document.getElementById("campo-folha-id").value || null,
+          folhaNome: document.getElementById("campo-folha-busca").value.trim() || null,
           objeto: campoObjeto.value.trim(),
           objetoNormalizado: normalizarTexto(campoObjeto.value),
           dataPagamento: campoDataPagamento.value,
@@ -1426,6 +1427,18 @@ async function renderizarDespesas(area) {
 
     modal.querySelector("#btn-ver-licitacao-vinculada")?.addEventListener("click", (evento) => {
       abrirModalResumoLicitacaoVinculada(registro.licitacaoId, evento.target);
+    });
+
+    configurarAutocomplete({
+      inputBusca: modal.querySelector("#campo-folha-busca"),
+      inputId: modal.querySelector("#campo-folha-id"),
+      resultadosEl: modal.querySelector("#resultados-folha"),
+      buscar: (termo) => buscarRegistrosPorNome("folhas", termo),
+      rotulo: (item) => `${item.nome} (${(item.servidoresIds || []).length} servidor(es))`,
+    });
+
+    modal.querySelector("#btn-ver-servidores-folha")?.addEventListener("click", (evento) => {
+      abrirModalServidoresDaFolha(registro.folhaId, evento.target);
     });
 
     modal.querySelector("#campo-sem-licitacao").addEventListener("change", (evento) => {
@@ -1542,6 +1555,33 @@ async function renderizarDespesas(area) {
  * poder ser combinada com outros filtros (ano, sem/com anexo) em cima
  * do resultado.
  */
+/**
+ * Busca por SUBSTRING (o termo pode estar em qualquer parte do texto,
+ * não só no começo) — o Firestore não tem índice nativo pra isso, então
+ * busca dentro de um conjunto limitado (pelo ano, se filtrado, ou a
+ * coleção toda, que nesses módulos costuma ter no máximo alguns
+ * milhares de registros) e filtra no navegador.
+ */
+async function buscarPorSubstringGenerico(nomeColecao, termoOriginal, camposParaChecar, opcoes = {}) {
+  const termoNormalizado = normalizarTexto(termoOriginal);
+  if (!termoNormalizado) return [];
+
+  let consulta = colecaoEntidade(nomeColecao);
+  if (opcoes.campoAno && opcoes.valorAno) {
+    consulta = consulta.where(opcoes.campoAno, "==", parseInt(opcoes.valorAno, 10));
+  } else if (opcoes.campoCompetencia && opcoes.valorAnoCompetencia) {
+    consulta = consulta
+      .orderBy(opcoes.campoCompetencia)
+      .startAt(`${opcoes.valorAnoCompetencia}-01`)
+      .endAt(`${opcoes.valorAnoCompetencia}-12`);
+  }
+
+  const snapshot = await consulta.limit(3000).get();
+  return snapshot.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() }))
+    .filter((registro) => camposParaChecar.some((campo) => (registro[campo] || "").toString().includes(termoNormalizado)));
+}
+
 async function buscarLicitacoesMultiCampoArray(termoOriginal) {
   const [parteNumero, parteAno] = termoOriginal.split("/").map((p) => p.trim());
   const termo = normalizarTexto(parteNumero);
@@ -1566,25 +1606,21 @@ async function buscarLicitacoesMultiCampoArray(termoOriginal) {
       .filter((registro) => registro.ano === anoNumero)
       .forEach((registro) => encontrados.set(registro.id, registro));
   } else {
-    // Busca geral: número OU modalidade OU objeto batendo o termo
-    // (e, se o termo inteiro for um ano de 4 dígitos, também ano)
-    const consultas = ["numeroNormalizado", "modalidadeNomeNormalizado", "objetoNormalizado"].map((campo) =>
-      colecaoEntidade("licitacoes")
-        .orderBy(campo)
-        .startAt(termo)
-        .endAt(termo + "\uf8ff")
-        .limit(TAMANHO_PAGINA)
-        .get()
+    // Busca geral por substring: número, modalidade ou objeto contendo
+    // o termo em qualquer posição (não só no começo do texto)
+    const encontradosLista = await buscarPorSubstringGenerico(
+      "licitacoes",
+      termo,
+      ["numeroNormalizado", "modalidadeNomeNormalizado", "objetoNormalizado"]
     );
+    encontradosLista.forEach((registro) => encontrados.set(registro.id, registro));
+
     if (/^\d{4}$/.test(termoOriginal)) {
-      consultas.push(colecaoEntidade("licitacoes").where("ano", "==", parseInt(termoOriginal, 10)).limit(TAMANHO_PAGINA).get());
-    }
-    const resultadosPorConsulta = await Promise.all(consultas);
-    resultadosPorConsulta.forEach((snapshot) => {
-      snapshot.docs.forEach((doc) => {
+      const snapshotAno = await colecaoEntidade("licitacoes").where("ano", "==", parseInt(termoOriginal, 10)).limit(TAMANHO_PAGINA).get();
+      snapshotAno.docs.forEach((doc) => {
         if (!encontrados.has(doc.id)) encontrados.set(doc.id, { id: doc.id, ...doc.data() });
       });
-    });
+    }
   }
 
   return [...encontrados.values()];
@@ -1599,34 +1635,11 @@ async function buscarDespesasMultiCampoArray(termoOriginal) {
   const termo = normalizarTexto(termoOriginal);
   if (!termo) return [];
 
-  const camposNormalizados = ["numeroEmpenhoNormalizado", "ordemPagamentoNormalizado", "credorNomeNormalizado", "objetoNormalizado"];
-  const consultas = camposNormalizados.map((campo) =>
-    colecaoEntidade("processosDespesa")
-      .orderBy(campo)
-      .startAt(termo)
-      .endAt(termo + "\uf8ff")
-      .limit(TAMANHO_PAGINA)
-      .get()
+  return buscarPorSubstringGenerico(
+    "processosDespesa",
+    termo,
+    ["numeroEmpenhoNormalizado", "ordemPagamentoNormalizado", "credorNomeNormalizado", "objetoNormalizado", "elementoDespesa"]
   );
-  // Elemento de despesa não precisa de campo normalizado à parte —
-  // é sempre digitado só com números e pontos, então busca direto.
-  consultas.push(
-    colecaoEntidade("processosDespesa")
-      .orderBy("elementoDespesa")
-      .startAt(termoOriginal.trim())
-      .endAt(termoOriginal.trim() + "\uf8ff")
-      .limit(TAMANHO_PAGINA)
-      .get()
-  );
-
-  const resultadosPorConsulta = await Promise.all(consultas);
-  const encontrados = new Map();
-  resultadosPorConsulta.forEach((snapshot) => {
-    snapshot.docs.forEach((doc) => {
-      if (!encontrados.has(doc.id)) encontrados.set(doc.id, { id: doc.id, ...doc.data() });
-    });
-  });
-  return [...encontrados.values()];
 }
 
 async function buscarRegistrosPorNome(nomeColecao, termo) {

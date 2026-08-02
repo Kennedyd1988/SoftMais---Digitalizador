@@ -3,10 +3,10 @@
 // Isso evita o problema clássico de PWA "preso" numa versão antiga
 // depois de uma atualização.
 
-const NOME_CACHE = "soft-indexacao-v33";
+const NOME_CACHE = "soft-indexacao-v53";
 const ARQUIVOS_ESSENCIAIS = [
   "./index.html",
-  "./css/estilos.css?v=33",
+  "./css/estilos.css?v=53",
   "./manifest.json",
   "./logo-horizontal.png",
   "./logo-simbolo.png",
@@ -31,6 +31,12 @@ self.addEventListener("activate", (evento) => {
 });
 
 self.addEventListener("fetch", (evento) => {
+  // Só faz sentido cachear GET — POST (ex: a chamada à Cloud Function
+  // que renova o acesso ao Drive) nunca pode ser cacheado pelo navegador.
+  if (evento.request.method !== "GET") {
+    return;
+  }
+
   // Não interceptar chamadas às APIs do Google (Firestore, Auth, Drive) —
   // deixar sempre passar direto pra rede, nunca cachear dados dinâmicos.
   if (evento.request.url.includes("googleapis.com") || evento.request.url.includes("google.com")) {

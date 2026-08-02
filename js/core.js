@@ -7,7 +7,7 @@
 // e na tela de login, para facilitar conferir se o navegador já está
 // com a versão mais recente (ajuda a identificar problema de cache).
 // ===================================================================
-const VERSAO_APP = "5.2";
+const VERSAO_APP = "7.16";
 document.addEventListener("DOMContentLoaded", () => {
   const elementoLogin = document.getElementById("versao-app-login");
   if (elementoLogin) elementoLogin.textContent = `v${VERSAO_APP}`;
@@ -20,6 +20,7 @@ const estado = {
   dadosUsuario: null, // documento de usuarios/{uid}: papel, unidadesGestoras, abasPermitidas
   entidadeAtual: null, // id da unidade gestora selecionada
   entidadeAtualNome: "",
+  entidadeAtualDados: null, // documento completo da entidade (endereço, logo, etc. — usado nos relatórios)
 };
 
 // -------------------------------------------------------------
@@ -247,6 +248,7 @@ auth.onAuthStateChanged(async (usuario) => {
 function mostrarTelaLogin() {
   document.getElementById("tela-login").classList.remove("oculto");
   document.getElementById("app-container").classList.add("oculto");
+  document.getElementById("tela-selecao-entidade").classList.add("oculto");
 }
 
 async function fazerLogin(email, senha) {
@@ -263,19 +265,27 @@ async function fazerLogout() {
 
 async function iniciarApp() {
   document.getElementById("tela-login").classList.add("oculto");
-  document.getElementById("app-container").classList.remove("oculto");
   document.getElementById("nome-usuario-logado").textContent =
     estado.dadosUsuario.nome || estado.usuario.email;
 
-  await carregarUnidadesGestorasDoUsuario();
-  montarMenuLateral();
+  const entidades = await carregarListaEntidadesDoUsuario();
+  if (entidades.length === 0) {
+    mostrarToast("Nenhuma unidade gestora liberada para este usuário.", "erro");
+    return;
+  }
+
+  popularSeletorEntidadeHeader(entidades);
+
+  if (entidades.length === 1) {
+    // Só uma opção — não faz sentido pedir pra escolher, abre direto
+    abrirAppComEntidade(entidades[0]);
+  } else {
+    mostrarTelaSelecaoEntidade(entidades);
+  }
 }
 
-/** Carrega a lista de unidades gestoras que o usuário pode acessar */
-async function carregarUnidadesGestorasDoUsuario() {
-  const seletor = document.getElementById("seletor-entidade");
-  seletor.innerHTML = "";
-
+/** Carrega a lista de unidades gestoras que o usuário pode acessar (sem selecionar nenhuma ainda) */
+async function carregarListaEntidadesDoUsuario() {
   let entidades = [];
   if (usuarioEhAdministrador()) {
     const snapshot = await db.collection("entidades").orderBy("nome").get();
@@ -290,31 +300,58 @@ async function carregarUnidadesGestorasDoUsuario() {
       .map((d) => ({ id: d.id, ...d.data() }))
       .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
   }
+  return entidades;
+}
 
-  if (entidades.length === 0) {
-    mostrarToast(
-      "Nenhuma unidade gestora liberada para este usuário.",
-      "erro"
-    );
-    return;
-  }
-
+function popularSeletorEntidadeHeader(entidades) {
+  const seletor = document.getElementById("seletor-entidade");
+  seletor.innerHTML = "";
   entidades.forEach((entidade) => {
     const opcao = document.createElement("option");
     opcao.value = entidade.id;
     opcao.textContent = entidade.nome;
     seletor.appendChild(opcao);
   });
-
-  estado.entidadeAtual = entidades[0].id;
-  estado.entidadeAtualNome = entidades[0].nome;
-
   seletor.addEventListener("change", () => {
     const entidade = entidades.find((e) => e.id === seletor.value);
-    estado.entidadeAtual = entidade.id;
-    estado.entidadeAtualNome = entidade.nome;
+    definirEntidadeAtual(entidade);
     navegarPara(paginaAtual || "inicio");
   });
+}
+
+function definirEntidadeAtual(entidade) {
+  estado.entidadeAtual = entidade.id;
+  estado.entidadeAtualNome = entidade.nome;
+  estado.entidadeAtualDados = entidade;
+}
+
+/** Mostra a tela de escolha de unidade gestora (só quando o usuário tem acesso a mais de uma) */
+function mostrarTelaSelecaoEntidade(entidades) {
+  const lista = document.getElementById("lista-entidades-selecao");
+  lista.innerHTML = entidades.map((entidade) => `
+    <button type="button" class="item-selecao-entidade" data-id="${entidade.id}">
+      ${entidade.logoBase64 ? `<img src="${entidade.logoBase64}" alt="">` : `<span class="icone-entidade-generico">🏢</span>`}
+      <span>${entidade.nome}</span>
+    </button>
+  `).join("");
+
+  document.getElementById("tela-selecao-entidade").classList.remove("oculto");
+
+  lista.querySelectorAll(".item-selecao-entidade").forEach((botao) => {
+    botao.addEventListener("click", () => {
+      const entidade = entidades.find((e) => e.id === botao.dataset.id);
+      document.getElementById("seletor-entidade").value = entidade.id;
+      document.getElementById("tela-selecao-entidade").classList.add("oculto");
+      abrirAppComEntidade(entidade);
+    });
+  });
+}
+
+function abrirAppComEntidade(entidade) {
+  definirEntidadeAtual(entidade);
+  document.getElementById("seletor-entidade").value = entidade.id;
+  document.getElementById("app-container").classList.remove("oculto");
+  montarMenuLateral();
 }
 
 // -------------------------------------------------------------
@@ -328,11 +365,18 @@ const ITENS_MENU = [
   { chave: "despesas", rotulo: "Processos de Despesa", icone: "💰", modulo: "despesas" },
   { chave: "legislacao", rotulo: "Legislação", icone: "⚖️", modulo: "legislacao" },
   { chave: "documentos-diversos", rotulo: "Documentos Diversos", icone: "📂", modulo: "documentosDiversos" },
+  { chave: "servidores", rotulo: "Servidores", icone: "👥", modulo: "servidores" },
+  { chave: "folhas", rotulo: "Folhas", icone: "📋", modulo: "folhas" },
+  { chave: "processos-pessoal", rotulo: "Processos de Pessoal", icone: "🧑‍💼", modulo: "processosPessoal" },
+  { chave: "atos-administrativos", rotulo: "Atos Administrativos", icone: "📜", modulo: "atosAdministrativos" },
   { chave: "relatorios", rotulo: "Relatórios", icone: "📊", modulo: "relatorios" },
+  { chave: "relatorios-detalhados", rotulo: "Relatórios Detalhados", icone: "🔎", modulo: "relatorios" },
   { chave: "modalidades-licitacao", rotulo: "Modalidades de Licitação", icone: "⚙️", modulo: "config" },
   { chave: "unidades-orcamentarias", rotulo: "Unidades Orçamentárias", icone: "⚙️", modulo: "config" },
   { chave: "fontes-recurso", rotulo: "Fontes de Recurso", icone: "⚙️", modulo: "config" },
   { chave: "tipos-documento", rotulo: "Tipos de Documento", icone: "⚙️", modulo: "config" },
+  { chave: "tipos-documento-pessoal", rotulo: "Tipos de Documento de Pessoal", icone: "⚙️", modulo: "config" },
+  { chave: "tipos-ato-administrativo", rotulo: "Tipos de Ato Administrativo", icone: "⚙️", modulo: "config" },
   { chave: "usuarios", rotulo: "Usuários", icone: "👤", modulo: "usuarios", somenteAdmin: true },
   { chave: "unidades-gestoras", rotulo: "Unidades Gestoras", icone: "🏢", modulo: "unidadesGestoras", somenteAdmin: true },
   { chave: "manutencao", rotulo: "Manutenção", icone: "🔧", modulo: "manutencao", somenteAdmin: true },
@@ -411,8 +455,23 @@ function navegarPara(chave) {
     case "documentos-diversos":
       renderizarDocumentosDiversos(area);
       break;
+    case "servidores":
+      renderizarServidores(area);
+      break;
+    case "folhas":
+      renderizarFolhas(area);
+      break;
+    case "processos-pessoal":
+      renderizarProcessosPessoal(area);
+      break;
+    case "atos-administrativos":
+      renderizarAtosAdministrativos(area);
+      break;
     case "relatorios":
       renderizarRelatorios(area);
+      break;
+    case "relatorios-detalhados":
+      renderizarRelatoriosDetalhados(area);
       break;
     case "modalidades-licitacao":
       renderizarCadastroSimples(area, "modalidadesLicitacao", "Modalidade de Licitação");
@@ -429,6 +488,12 @@ function navegarPara(chave) {
       break;
     case "tipos-documento":
       renderizarCadastroSimples(area, "tiposDocumento", "Tipo de Documento");
+      break;
+    case "tipos-documento-pessoal":
+      renderizarCadastroSimples(area, "tiposDocumentoPessoal", "Tipo de Documento de Pessoal");
+      break;
+    case "tipos-ato-administrativo":
+      renderizarCadastroSimples(area, "tiposAtoAdministrativo", "Tipo de Ato Administrativo");
       break;
     case "usuarios":
       renderizarUsuarios(area);
@@ -456,71 +521,86 @@ async function renderizarInicio(area) {
     <div id="area-dashboard"><p class="texto-secundario" style="margin-top:16px">Calculando resumo do ano...</p></div>
   `;
 
-  if (!usuarioTemAcessoAba("despesas") && !usuarioEhAdministrador()) {
-    // Usuário sem acesso a Despesas não precisa do dashboard financeiro
+  // Cada módulo do dashboard só aparece se o usuário tem acesso àquela aba
+  const acesso = {
+    despesas: usuarioEhAdministrador() || usuarioTemAcessoAba("despesas"),
+    licitacoes: usuarioEhAdministrador() || usuarioTemAcessoAba("licitacoes"),
+    legislacao: usuarioEhAdministrador() || usuarioTemAcessoAba("legislacao"),
+    documentosDiversos: usuarioEhAdministrador() || usuarioTemAcessoAba("documentosDiversos"),
+    processosPessoal: usuarioEhAdministrador() || usuarioTemAcessoAba("processosPessoal"),
+    atosAdministrativos: usuarioEhAdministrador() || usuarioTemAcessoAba("atosAdministrativos"),
+  };
+
+  if (!Object.values(acesso).some(Boolean)) {
     document.getElementById("area-dashboard").innerHTML = `<p class="texto-secundario" style="margin-top:16px">Use o menu ao lado para acessar os cadastros e processos.</p>`;
     return;
   }
 
   try {
-    const anoAtual = new Date().getFullYear();
-    const inicioCompetencia = `${anoAtual}-01`;
-    const fimCompetencia = `${anoAtual}-12`;
-
-    const [snapshotDespesas, snapshotLicitacoes, snapshotLegislacao, snapshotDocumentos] = await Promise.all([
-      colecaoEntidade("processosDespesa").where("competenciaKey", ">=", inicioCompetencia).where("competenciaKey", "<=", fimCompetencia).get(),
-      colecaoEntidade("licitacoes").where("ano", "==", anoAtual).get(),
-      colecaoEntidade("legislacao").where("ano", "==", anoAtual).get(),
-      colecaoEntidade("documentosDiversos").where("ano", "==", anoAtual).get(),
+    const [snapshotDespesas, snapshotLicitacoes, snapshotLegislacao, snapshotDocumentos, snapshotPessoal, snapshotAtos] = await Promise.all([
+      acesso.despesas ? colecaoEntidade("processosDespesa").get() : null,
+      acesso.licitacoes ? colecaoEntidade("licitacoes").get() : null,
+      acesso.legislacao ? colecaoEntidade("legislacao").get() : null,
+      acesso.documentosDiversos ? colecaoEntidade("documentosDiversos").get() : null,
+      acesso.processosPessoal ? colecaoEntidade("processosPessoal").get() : null,
+      acesso.atosAdministrativos ? colecaoEntidade("atosAdministrativos").get() : null,
     ]);
 
-    const despesas = snapshotDespesas.docs.map((doc) => doc.data());
-    const totalValor = despesas.reduce((soma, d) => soma + (d.valor || 0), 0);
-    const semAnexo = despesas.filter((d) => !temAnexoGenerico(d)).length;
+    const despesas = snapshotDespesas ? snapshotDespesas.docs.map((doc) => doc.data()) : [];
+    const semAnexoDespesas = despesas.filter((d) => !temAnexoGenerico(d)).length;
     const semLicitacao = despesas.filter((d) => !d.licitacaoId && !d.semLicitacaoVinculada).length;
 
+    const pessoal = snapshotPessoal ? snapshotPessoal.docs.map((doc) => doc.data()) : [];
+    const semAnexoPessoal = pessoal.filter((p) => !temAnexoGenerico(p)).length;
+
+    const cartoesModulos = [
+      acesso.despesas ? { rotulo: "Processos de Despesa", valor: snapshotDespesas.size } : null,
+      acesso.licitacoes ? { rotulo: "Licitações", valor: snapshotLicitacoes.size } : null,
+      acesso.legislacao ? { rotulo: "Atos de Legislação", valor: snapshotLegislacao.size } : null,
+      acesso.documentosDiversos ? { rotulo: "Documentos Diversos", valor: snapshotDocumentos.size } : null,
+      acesso.processosPessoal ? { rotulo: "Processos de Pessoal", valor: snapshotPessoal.size } : null,
+      acesso.atosAdministrativos ? { rotulo: "Atos Administrativos", valor: snapshotAtos.size } : null,
+    ].filter(Boolean);
+
+    const cartoesAtencao = [
+      acesso.despesas && semAnexoDespesas > 0
+        ? { id: "card-despesas-sem-anexo", cor: "var(--vermelho-erro)", valor: semAnexoDespesas, rotulo: `Despesa(s) sem PDF anexado`, destino: "despesas" }
+        : null,
+      acesso.despesas && semLicitacao > 0
+        ? { id: "card-despesas-sem-licitacao", cor: "var(--amber, #b3790f)", valor: semLicitacao, rotulo: `Despesa(s) sem decisão de licitação`, destino: "despesas" }
+        : null,
+      acesso.processosPessoal && semAnexoPessoal > 0
+        ? { id: "card-pessoal-sem-anexo", cor: "var(--vermelho-erro)", valor: semAnexoPessoal, rotulo: `Processo(s) de Pessoal sem PDF anexado`, destino: "processos-pessoal" }
+        : null,
+    ].filter(Boolean);
+
     document.getElementById("area-dashboard").innerHTML = `
-      <h3 style="margin-top:20px">Resumo de ${anoAtual}</h3>
+      <h3 style="margin-top:20px">Resumo Geral (todos os registros)</h3>
       <div class="grade-resumo">
-        <div class="cartao-resumo">
-          <div class="numero-resumo num">${formatarMoeda(totalValor)}</div>
-          <div class="rotulo-resumo">Total de Despesas (${despesas.length} processo(s))</div>
-        </div>
-        <div class="cartao-resumo">
-          <div class="numero-resumo num">${snapshotLicitacoes.size}</div>
-          <div class="rotulo-resumo">Licitações</div>
-        </div>
-        <div class="cartao-resumo">
-          <div class="numero-resumo num">${snapshotLegislacao.size}</div>
-          <div class="rotulo-resumo">Atos de Legislação</div>
-        </div>
-        <div class="cartao-resumo">
-          <div class="numero-resumo num">${snapshotDocumentos.size}</div>
-          <div class="rotulo-resumo">Documentos Diversos</div>
-        </div>
+        ${cartoesModulos.map((c) => `
+          <div class="cartao-resumo">
+            <div class="numero-resumo num">${c.valor}</div>
+            <div class="rotulo-resumo">${c.rotulo}</div>
+          </div>`).join("")}
       </div>
 
       ${
-        semAnexo > 0 || semLicitacao > 0
+        cartoesAtencao.length > 0
           ? `<h3>Pontos de atenção</h3>
              <div class="grade-resumo">
-               ${semAnexo > 0 ? `
-                 <div class="cartao-resumo cartao-atencao" id="card-despesas-sem-anexo" style="cursor:pointer">
-                   <div class="numero-resumo num" style="color:var(--vermelho-erro)">${semAnexo}</div>
-                   <div class="rotulo-resumo">Despesa(s) de ${anoAtual} sem PDF anexado</div>
-                 </div>` : ""}
-               ${semLicitacao > 0 ? `
-                 <div class="cartao-resumo cartao-atencao" id="card-despesas-sem-licitacao" style="cursor:pointer">
-                   <div class="numero-resumo num" style="color:var(--amber, #b3790f)">${semLicitacao}</div>
-                   <div class="rotulo-resumo">Despesa(s) de ${anoAtual} sem decisão de licitação</div>
-                 </div>` : ""}
+               ${cartoesAtencao.map((c) => `
+                 <div class="cartao-resumo cartao-atencao" id="${c.id}" style="cursor:pointer">
+                   <div class="numero-resumo num" style="color:${c.cor}">${c.valor}</div>
+                   <div class="rotulo-resumo">${c.rotulo}</div>
+                 </div>`).join("")}
              </div>`
-          : `<p class="texto-secundario">Nenhum ponto de atenção nas despesas de ${anoAtual} — todas têm anexo e decisão de licitação registrada.</p>`
+          : `<p class="texto-secundario">Nenhum ponto de atenção — tudo com anexo e decisão registrada.</p>`
       }
     `;
 
-    document.getElementById("card-despesas-sem-anexo")?.addEventListener("click", () => navegarPara("despesas"));
-    document.getElementById("card-despesas-sem-licitacao")?.addEventListener("click", () => navegarPara("despesas"));
+    cartoesAtencao.forEach((c) => {
+      document.getElementById(c.id)?.addEventListener("click", () => navegarPara(c.destino));
+    });
   } catch (erro) {
     console.error(erro);
     document.getElementById("area-dashboard").innerHTML = `<p class="texto-secundario" style="margin-top:16px">Não foi possível calcular o resumo agora. Use o menu ao lado pra acessar os cadastros e processos.</p>`;
@@ -530,6 +610,33 @@ async function renderizarInicio(area) {
 /** Verifica se um registro tem anexo, com fallback pra registros antigos sem quantidadeAnexos (versão local, sem depender de processos.js) */
 function temAnexoGenerico(registro) {
   return (registro.quantidadeAnexos ?? (registro.anexos || []).length) > 0;
+}
+
+/**
+ * Lê um arquivo de imagem, redimensiona no navegador (mantendo
+ * proporção) e devolve como base64 — evita guardar imagens grandes
+ * sem necessidade (nunca usamos Firebase Storage nesse app).
+ */
+function redimensionarImagemParaBase64(arquivo, larguraMaxima = 300) {
+  return new Promise((resolve, reject) => {
+    const leitor = new FileReader();
+    leitor.onload = (eventoLeitor) => {
+      const img = new Image();
+      img.onload = () => {
+        const escala = Math.min(1, larguraMaxima / img.width);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * escala);
+        canvas.height = Math.round(img.height * escala);
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/png"));
+      };
+      img.onerror = () => reject(new Error("Não foi possível ler essa imagem."));
+      img.src = eventoLeitor.target.result;
+    };
+    leitor.onerror = () => reject(new Error("Não foi possível ler esse arquivo."));
+    leitor.readAsDataURL(arquivo);
+  });
 }
 
 // Referência de coleção da entidade atual (atalho usado pelos módulos)
@@ -549,6 +656,10 @@ const ROTULOS_COLECAO_HISTORICO = {
   processosDespesa: "Processo de Despesa",
   legislacao: "Legislação",
   documentosDiversos: "Documento Diverso",
+  servidores: "Servidor",
+  folhas: "Folha",
+  processosPessoal: "Processo de Pessoal",
+  atosAdministrativos: "Ato Administrativo",
 };
 
 /**
@@ -586,6 +697,10 @@ async function renderizarHistorico(area) {
         <option value="processosDespesa">Processos de Despesa</option>
         <option value="legislacao">Legislação</option>
         <option value="documentosDiversos">Documentos Diversos</option>
+        <option value="servidores">Servidores</option>
+        <option value="folhas">Folhas</option>
+        <option value="processosPessoal">Processos de Pessoal</option>
+        <option value="atosAdministrativos">Atos Administrativos</option>
       </select>
     </div>
     <div id="lista-registros" class="lista-cartoes"></div>

@@ -10,27 +10,38 @@
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/estilos.css?v=61">
+  <link rel="stylesheet" href="css/estilos.css?v=65">
 </head>
 <body>
 
   <!-- ============== TELA DE LOGIN ============== -->
-  <div id="tela-login" class="tela-login">
-    <div class="caixa-login">
-      <img src="logo-horizontal.png" alt="SOFT+" class="logo-login">
-      <h1 class="titulo-login">Indexação de Documentos</h1>
-      <p class="texto-secundario descricao-login">
-        Organize e encontre em segundos os documentos de Licitações,
-        Despesas, Legislação e Recursos Humanos da sua unidade gestora —
-        tudo digitalizado, com anexos em PDF vinculados a cada registro.
+  <div id="tela-login" class="tela-login-split">
+    <div class="painel-login-azul">
+      <img src="logo-horizontal.png" alt="SOFT+" class="logo-login-grande">
+      <h1 class="titulo-painel-azul">Documentos organizados,<br>sem complicação.</h1>
+      <p class="descricao-painel-azul">
+        Licitações, despesas, legislação e recursos humanos — tudo
+        indexado, com anexos em PDF vinculados a cada registro.
       </p>
-      <label>E-mail</label>
-      <input type="email" id="login-email" autocomplete="username">
-      <label>Senha</label>
-      <input type="password" id="login-senha" autocomplete="current-password">
-      <button class="botao-primario botao-largura-total" id="btn-entrar">Entrar</button>
-      <button type="button" class="botao-link" id="btn-esqueci-senha">Esqueci minha senha</button>
-      <div id="erro-login" class="mensagem-erro oculto"></div>
+      <ul class="lista-checklist-login">
+        <li><span class="marca-check">✓</span> Busca rápida em todos os processos</li>
+        <li><span class="marca-check">✓</span> Vários usuários, cada um com seu papel e permissões</li>
+        <li><span class="marca-check">✓</span> Funciona como app instalado no celular</li>
+      </ul>
+    </div>
+    <div class="painel-login-form">
+      <div class="caixa-login">
+        <img src="logo-horizontal.png" alt="SOFT+" class="logo-login">
+        <p class="texto-secundario descricao-login-curta">Indexação de Documentos — entrar</p>
+        <label>E-mail <span class="obrigatorio-campo">*</span></label>
+        <input type="email" id="login-email" autocomplete="username">
+        <label>Senha <span class="obrigatorio-campo">*</span></label>
+        <input type="password" id="login-senha" autocomplete="current-password">
+        <button class="botao-primario botao-largura-total" id="btn-entrar">Entrar</button>
+        <div id="erro-login" class="mensagem-erro oculto"></div>
+        <button type="button" class="botao-link" id="btn-esqueci-senha">Esqueci minha senha</button>
+      </div>
+      <button type="button" class="botao-instalar-login oculto" id="btn-instalar-app-login">⬇️ Instalar app no celular</button>
       <p class="versao-app" id="versao-app-login"></p>
     </div>
   </div>
@@ -86,19 +97,19 @@
   <!-- JSZip — usado para exportar vários PDFs de uma vez, compactados -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
-  <script src="js/firebase-config.js?v=61"></script>
-  <script src="js/core.js?v=61"></script>
-  <script src="js/drive.js?v=61"></script>
-  <script src="js/anexos.js?v=61"></script>
-  <script src="js/importacao-exportacao.js?v=61"></script>
-  <script src="js/cadastros-simples.js?v=61"></script>
-  <script src="js/processos.js?v=61"></script>
-  <script src="js/pessoal.js?v=61"></script>
-  <script src="js/migracao-appsheet.js?v=61"></script>
-  <script src="js/relatorios.js?v=61"></script>
-  <script src="js/relatorios-detalhados.js?v=61"></script>
-  <script src="js/manutencao.js?v=61"></script>
-  <script src="js/usuarios.js?v=61"></script>
+  <script src="js/firebase-config.js?v=65"></script>
+  <script src="js/core.js?v=65"></script>
+  <script src="js/drive.js?v=65"></script>
+  <script src="js/anexos.js?v=65"></script>
+  <script src="js/importacao-exportacao.js?v=65"></script>
+  <script src="js/cadastros-simples.js?v=65"></script>
+  <script src="js/processos.js?v=65"></script>
+  <script src="js/pessoal.js?v=65"></script>
+  <script src="js/migracao-appsheet.js?v=65"></script>
+  <script src="js/relatorios.js?v=65"></script>
+  <script src="js/relatorios-detalhados.js?v=65"></script>
+  <script src="js/manutencao.js?v=65"></script>
+  <script src="js/usuarios.js?v=65"></script>
 
   <script>
     // -------- Login --------
@@ -164,14 +175,18 @@
       evento.preventDefault();
       eventoInstalacao = evento;
       document.getElementById("btn-instalar-app").classList.remove("oculto");
+      document.getElementById("btn-instalar-app-login").classList.remove("oculto");
     });
-    document.getElementById("btn-instalar-app").addEventListener("click", async () => {
+    async function instalarApp() {
       if (!eventoInstalacao) return;
       eventoInstalacao.prompt();
       await eventoInstalacao.userChoice;
       eventoInstalacao = null;
       document.getElementById("btn-instalar-app").classList.add("oculto");
-    });
+      document.getElementById("btn-instalar-app-login").classList.add("oculto");
+    }
+    document.getElementById("btn-instalar-app").addEventListener("click", instalarApp);
+    document.getElementById("btn-instalar-app-login").addEventListener("click", instalarApp);
 
     // -------- Service Worker (estratégia network-first) --------
     if ("serviceWorker" in navigator) {

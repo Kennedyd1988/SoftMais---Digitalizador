@@ -440,7 +440,11 @@ async function renderizarProcessosPessoal(area) {
     document.getElementById("btn-carregar-mais").classList.add("oculto");
     lista.innerHTML = `<p class="texto-secundario">Filtrando...</p>`;
     try {
-      const snapshot = await colecaoEntidade("processosPessoal").limit(5000).get();
+      const anoAtivo = document.getElementById("filtro-ano").value;
+      const consultaBase = anoAtivo
+        ? colecaoEntidade("processosPessoal").where("exercicio", "==", parseInt(anoAtivo, 10))
+        : colecaoEntidade("processosPessoal").limit(5000);
+      const snapshot = await consultaBase.get();
       let registros = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       if (servidorId) registros = registros.filter((r) => r.servidorId === servidorId);
       if (tipoId) registros = registros.filter((r) => r.tipoId === tipoId);
@@ -542,7 +546,7 @@ async function renderizarProcessosPessoal(area) {
         <input type="checkbox" class="checkbox-selecao-registro" title="Selecionar pra exportação em lote">
         <div>
           <strong>${registro.tipoNome || "Tipo não informado"}</strong> ${registro.servidorNome ? "— " + registro.servidorNome : ""}
-          <div class="texto-secundario">${registro.observacoes || ""}</div>
+          <div class="texto-secundario">${escaparHtml(registro.observacoes || "")}</div>
           <div class="texto-secundario">Exercício ${registro.exercicio || "-"} ${registro.competencia ? "· Competência " + registro.competencia.slice(5,7) + "/" + registro.competencia.slice(0,4) : ""}</div>
           <div class="texto-secundario">${(registro.anexos || []).length} anexo(s)</div>
         </div>
@@ -798,7 +802,11 @@ async function renderizarAtosAdministrativos(area) {
     document.getElementById("btn-carregar-mais").classList.add("oculto");
     lista.innerHTML = `<p class="texto-secundario">Filtrando...</p>`;
     try {
-      const snapshot = await colecaoEntidade("atosAdministrativos").limit(5000).get();
+      const anoAtivo = document.getElementById("filtro-ano").value;
+      const consultaBase = anoAtivo
+        ? colecaoEntidade("atosAdministrativos").where("exercicio", "==", parseInt(anoAtivo, 10))
+        : colecaoEntidade("atosAdministrativos").limit(5000);
+      const snapshot = await consultaBase.get();
       let registros = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       if (numero) registros = registros.filter((r) => (r.numeroNormalizado || "").includes(numero));
       if (tipoId) registros = registros.filter((r) => r.tipoId === tipoId);
@@ -904,7 +912,7 @@ async function renderizarAtosAdministrativos(area) {
         <input type="checkbox" class="checkbox-selecao-registro" title="Selecionar pra exportação em lote">
         <div>
           <strong>${registro.tipoNome || "Tipo"} nº ${registro.numero}</strong>
-          <div class="texto-secundario">${registro.descricao || ""}</div>
+          <div class="texto-secundario">${escaparHtml(registro.descricao || "")}</div>
           <div class="texto-secundario">Exercício ${registro.exercicio || "-"} ${(registro.servidoresNomes || []).length > 0 ? "· " + registro.servidoresNomes.length + " servidor(es) envolvido(s)" : ""}</div>
           <div class="texto-secundario">${(registro.anexos || []).length} anexo(s)</div>
         </div>
@@ -1230,7 +1238,7 @@ async function abrirModalVinculadosServidor(servidor, botaoOrigem) {
             ? `<p class="texto-secundario">Nenhum.</p>`
             : pessoal.map((p) => `
                 <div class="cartao-registro linha-vinculado-servidor" data-colecao="processosPessoal" data-id="${p.id}" style="cursor:pointer">
-                  <div><strong>${p.tipoNome || "Tipo não informado"}</strong><div class="texto-secundario">${p.observacoes || ""} · ${p.exercicio || ""}</div></div>
+                  <div><strong>${p.tipoNome || "Tipo não informado"}</strong><div class="texto-secundario">${escaparHtml(p.observacoes || "")} · ${p.exercicio || ""}</div></div>
                 </div>`).join("")
         }
         <h4 style="margin-top:18px">Atos Administrativos (${atos.length})</h4>
@@ -1239,7 +1247,7 @@ async function abrirModalVinculadosServidor(servidor, botaoOrigem) {
             ? `<p class="texto-secundario">Nenhum.</p>`
             : atos.map((a) => `
                 <div class="cartao-registro linha-vinculado-servidor" data-colecao="atosAdministrativos" data-id="${a.id}" style="cursor:pointer">
-                  <div><strong>${a.tipoNome || "Tipo"} nº ${a.numero || ""}</strong><div class="texto-secundario">${(a.descricao || "").slice(0, 80)}</div></div>
+                  <div><strong>${a.tipoNome || "Tipo"} nº ${a.numero || ""}</strong><div class="texto-secundario">${escaparHtml((a.descricao || "").slice(0, 80))}</div></div>
                 </div>`).join("")
         }
         <h4 style="margin-top:18px">Processos de Despesa via Folha (${despesas.length})</h4>

@@ -26,8 +26,12 @@ body {
   font-family: 'Inter', system-ui, sans-serif;
   background: var(--ink);
   color: var(--text);
+  font-size: 14px;
 }
-h1, h2, h3 { font-family: 'Source Serif 4', serif; }
+h1 { font-size: 22px; }
+h2 { font-size: 19px; }
+h3 { font-size: 16px; }
+h1, h2, h3 { font-family: 'Source Serif 4', serif; margin: 0 0 8px; }
 .num { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
 
 .oculto { display: none !important; }
@@ -49,7 +53,89 @@ h1, h2, h3 { font-family: 'Source Serif 4', serif; }
   box-shadow: 0 10px 30px rgba(0,0,0,0.2);
 }
 .logo-login { height: 34px; margin-bottom: 14px; }
-.simbolo-cabecalho { height: 20px; vertical-align: middle; margin-right: 6px; }
+
+/* ---------- LOGIN (layout dividido) ---------- */
+.tela-login-split {
+  min-height: 100vh;
+  display: flex;
+}
+.painel-login-azul {
+  flex: 1 1 46%;
+  background: linear-gradient(160deg, var(--brand), #093a94 55%, #072456);
+  color: var(--branco);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 60px 64px;
+  gap: 22px;
+}
+.logo-login-grande {
+  height: 32px;
+  width: auto;
+  filter: brightness(0) invert(1); /* a logo é azul — precisa virar branca em cima do fundo azul */
+  margin-bottom: 12px;
+}
+.titulo-painel-azul {
+  color: var(--branco);
+  font-size: 34px;
+  line-height: 1.25;
+  margin: 0;
+}
+.descricao-painel-azul {
+  color: rgba(255,255,255,0.85);
+  font-size: 15px;
+  line-height: 1.6;
+  max-width: 440px;
+  margin: 0;
+}
+.lista-checklist-login { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-direction: column; gap: 12px; }
+.lista-checklist-login li { display: flex; align-items: center; gap: 10px; font-size: 14px; color: rgba(255,255,255,0.95); font-weight: 500; }
+.marca-check {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: rgba(255,255,255,0.18); font-size: 11px; flex-shrink: 0;
+}
+.painel-login-form {
+  flex: 1 1 54%;
+  background: var(--ink);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 40px 24px;
+}
+.painel-login-form .caixa-login { box-shadow: 0 10px 30px rgba(15,41,71,0.08); }
+.descricao-login-curta { margin-bottom: 8px; }
+.obrigatorio-campo { color: var(--vermelho-erro); }
+.botao-instalar-login {
+  background: var(--branco);
+  border: 1px solid var(--cinza-borda);
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+.botao-instalar-login:hover { border-color: var(--azul-principal); color: var(--azul-principal); }
+
+@media (max-width: 760px) {
+  .tela-login-split { flex-direction: column; }
+  .painel-login-azul { flex: none; padding: 36px 28px; gap: 16px; }
+  .titulo-painel-azul { font-size: 24px; }
+  .lista-checklist-login { display: none; } /* economiza espaço no celular */
+  .painel-login-form { flex: none; padding: 32px 20px; }
+}
+
+.simbolo-cabecalho {
+  height: 20px;
+  vertical-align: middle;
+  margin-right: 6px;
+  background: var(--branco);
+  border-radius: 50%;
+  padding: 3px;
+  box-sizing: content-box;
+}
 .caixa-login h1 {
   color: var(--azul-principal);
   font-size: 22px;

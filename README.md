@@ -210,6 +210,54 @@ está tudo certo.
 
 ## Changelog
 
+**v8.9** — Tela de login redesenhada no layout dividido (mesmo padrão
+usado no app Financeiro de Igrejas): lado esquerdo azul com a logo
+SOFT+ **grande** (convertida pra branca automaticamente, já que o
+arquivo original é azul), título, descrição e lista de destaques com
+check ✓; lado direito com o cartão de login branco, incluindo o
+"Esqueci minha senha" e um botão de instalar o app que também aparece
+aqui (não só depois de logado). No celular, a lista de destaques some
+pra economizar espaço, mantendo só o essencial. Também confirmado que
+os dois ajustes anteriores (contraste da logo no cabeçalho e fontes
+reduzidas) estão inclusos nesta entrega.
+
+**v8.8** — Dois ajustes visuais:
+- **Logo do cabeçalho**: ganhou um fundo branco arredondado atrás dela,
+  pra não se confundir mais com o azul do cabeçalho.
+- **Fontes reduzidas**: tamanho base do texto (16px → 14px) e dos
+  títulos (h1/h2/h3) um pouco menores, pra um visual mais compacto e
+  fluido, sem perder legibilidade.
+
+**v8.7** — Menu lateral reorganizado nos grupos: **Cadastros**
+(Credores/Fornecedores, Modalidades de Licitação, Unidades
+Orçamentárias, Fontes de Recurso, Tipos de Documento), **Licitações e
+Demais Processos** (Licitações, Processos de Despesa, Legislação,
+Documentos Diversos), **Recursos Humanos** (Servidores, Folhas,
+Processos de Pessoal, Atos Administrativos, Tipos de Documento de
+Pessoal, Tipos de Ato Administrativo) e **Relatórios** (Relatórios,
+Relatórios Detalhados). Início e o grupo Administração continuam como
+estavam.
+
+**v8.6** — Três correções da auditoria geral do código (sem mudar
+nenhuma funcionalidade existente):
+
+1. **Bug real de performance corrigido**: os campos de busca com
+   autocomplete (Credor, Licitação, Folha, Servidor) adicionavam um
+   "ouvinte" de clique no documento inteiro toda vez que um formulário
+   era aberto, e nunca removiam — acumulando ao longo da sessão e
+   deixando o app progressivamente mais lento. Agora cada um se
+   auto-remove sozinho assim que o formulário fecha.
+2. **Reforço de segurança**: texto livre digitado pelo usuário (Objeto,
+   Observações, Descrição, CNPJ, CPF/CNPJ de credor, resumo do
+   histórico) agora é escapado antes de entrar na tela — evita que
+   texto parecido com código digitado num desses campos afete a
+   exibição pra outros usuários.
+3. **Otimização dos Filtros Avançados**: quando o filtro de Ano/
+   Exercício já está selecionado, a busca agora usa ele como filtro no
+   servidor primeiro (bem mais rápido e mais barato), em vez de sempre
+   buscar até 5.000 registros de uma vez. Sem ano selecionado, continua
+   funcionando como antes.
+
 **v8.5** — Verificação da reorganização de Volumes: a renomeação no
 Drive funciona corretamente, inclusive quando dois anexos são movidos
 pro mesmo volume ao mesmo tempo (nomes ficam únicos, sem colidir). Mas

@@ -7,7 +7,7 @@
 // e na tela de login, para facilitar conferir se o navegador já está
 // com a versão mais recente (ajuda a identificar problema de cache).
 // ===================================================================
-const VERSAO_APP = "8.5";
+const VERSAO_APP = "8.9";
 document.addEventListener("DOMContentLoaded", () => {
   const elementoLogin = document.getElementById("versao-app-login");
   if (elementoLogin) elementoLogin.textContent = `v${VERSAO_APP}`;
@@ -28,6 +28,18 @@ const estado = {
 // -------------------------------------------------------------
 
 /** Remove acento e caixa alta, para permitir busca "joao" = "João" */
+/**
+ * Escapa texto livre digitado pelo usuário antes de colocar dentro de
+ * HTML (ex: campo "Objeto") — evita que alguém digite algo parecido com
+ * código e isso acabe rodando na tela de quem for ver aquele registro.
+ */
+function escaparHtml(texto) {
+  if (texto === null || texto === undefined) return "";
+  const div = document.createElement("div");
+  div.textContent = String(texto);
+  return div.innerHTML;
+}
+
 function normalizarTexto(texto) {
   return (texto || "")
     .toString()
@@ -360,23 +372,28 @@ function abrirAppComEntidade(entidade) {
 
 const ITENS_MENU = [
   { chave: "inicio", rotulo: "Início", icone: "🏠", modulo: null, grupo: null },
-  { chave: "credores", rotulo: "Credores/Fornecedores", icone: "🧾", modulo: "credores", grupo: "Financeiro" },
-  { chave: "licitacoes", rotulo: "Licitações", icone: "📑", modulo: "licitacoes", grupo: "Financeiro" },
-  { chave: "despesas", rotulo: "Processos de Despesa", icone: "💰", modulo: "despesas", grupo: "Financeiro" },
-  { chave: "legislacao", rotulo: "Legislação", icone: "⚖️", modulo: "legislacao", grupo: "Financeiro" },
-  { chave: "documentos-diversos", rotulo: "Documentos Diversos", icone: "📂", modulo: "documentosDiversos", grupo: "Financeiro" },
+
+  { chave: "credores", rotulo: "Credores/Fornecedores", icone: "🧾", modulo: "credores", grupo: "Cadastros" },
+  { chave: "modalidades-licitacao", rotulo: "Modalidades de Licitação", icone: "⚙️", modulo: "config", grupo: "Cadastros" },
+  { chave: "unidades-orcamentarias", rotulo: "Unidades Orçamentárias", icone: "⚙️", modulo: "config", grupo: "Cadastros" },
+  { chave: "fontes-recurso", rotulo: "Fontes de Recurso", icone: "⚙️", modulo: "config", grupo: "Cadastros" },
+  { chave: "tipos-documento", rotulo: "Tipos de Documento", icone: "⚙️", modulo: "config", grupo: "Cadastros" },
+
+  { chave: "licitacoes", rotulo: "Licitações", icone: "📑", modulo: "licitacoes", grupo: "Licitações e Demais Processos" },
+  { chave: "despesas", rotulo: "Processos de Despesa", icone: "💰", modulo: "despesas", grupo: "Licitações e Demais Processos" },
+  { chave: "legislacao", rotulo: "Legislação", icone: "⚖️", modulo: "legislacao", grupo: "Licitações e Demais Processos" },
+  { chave: "documentos-diversos", rotulo: "Documentos Diversos", icone: "📂", modulo: "documentosDiversos", grupo: "Licitações e Demais Processos" },
+
   { chave: "servidores", rotulo: "Servidores", icone: "👥", modulo: "servidores", grupo: "Recursos Humanos" },
   { chave: "folhas", rotulo: "Folhas", icone: "📋", modulo: "folhas", grupo: "Recursos Humanos" },
   { chave: "processos-pessoal", rotulo: "Processos de Pessoal", icone: "🧑‍💼", modulo: "processosPessoal", grupo: "Recursos Humanos" },
   { chave: "atos-administrativos", rotulo: "Atos Administrativos", icone: "📜", modulo: "atosAdministrativos", grupo: "Recursos Humanos" },
+  { chave: "tipos-documento-pessoal", rotulo: "Tipos de Documento de Pessoal", icone: "⚙️", modulo: "config", grupo: "Recursos Humanos" },
+  { chave: "tipos-ato-administrativo", rotulo: "Tipos de Ato Administrativo", icone: "⚙️", modulo: "config", grupo: "Recursos Humanos" },
+
   { chave: "relatorios", rotulo: "Relatórios", icone: "📊", modulo: "relatorios", grupo: "Relatórios" },
   { chave: "relatorios-detalhados", rotulo: "Relatórios Detalhados", icone: "🔎", modulo: "relatorios", grupo: "Relatórios" },
-  { chave: "modalidades-licitacao", rotulo: "Modalidades de Licitação", icone: "⚙️", modulo: "config", grupo: "Cadastros de Apoio" },
-  { chave: "unidades-orcamentarias", rotulo: "Unidades Orçamentárias", icone: "⚙️", modulo: "config", grupo: "Cadastros de Apoio" },
-  { chave: "fontes-recurso", rotulo: "Fontes de Recurso", icone: "⚙️", modulo: "config", grupo: "Cadastros de Apoio" },
-  { chave: "tipos-documento", rotulo: "Tipos de Documento", icone: "⚙️", modulo: "config", grupo: "Cadastros de Apoio" },
-  { chave: "tipos-documento-pessoal", rotulo: "Tipos de Documento de Pessoal", icone: "⚙️", modulo: "config", grupo: "Cadastros de Apoio" },
-  { chave: "tipos-ato-administrativo", rotulo: "Tipos de Ato Administrativo", icone: "⚙️", modulo: "config", grupo: "Cadastros de Apoio" },
+
   { chave: "usuarios", rotulo: "Usuários", icone: "👤", modulo: "usuarios", somenteAdmin: true, grupo: "Administração" },
   { chave: "unidades-gestoras", rotulo: "Unidades Gestoras", icone: "🏢", modulo: "unidadesGestoras", somenteAdmin: true, grupo: "Administração" },
   { chave: "manutencao", rotulo: "Manutenção", icone: "🔧", modulo: "manutencao", somenteAdmin: true, grupo: "Administração" },
@@ -770,7 +787,7 @@ async function renderizarHistorico(area) {
     cartao.innerHTML = `
       <div>
         <strong>${ROTULOS_ACAO[item.acao] || item.acao}</strong> — ${ROTULOS_COLECAO_HISTORICO[item.colecao] || item.colecao}
-        <div class="texto-secundario">${item.resumo || ""}</div>
+        <div class="texto-secundario">${escaparHtml(item.resumo || "")}</div>
         <div class="texto-secundario">${item.usuarioNome || item.usuarioEmail} · ${formatarDataHora(item.dataHora)}</div>
       </div>
     `;

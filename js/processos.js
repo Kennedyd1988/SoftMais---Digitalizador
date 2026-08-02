@@ -259,7 +259,7 @@ async function abrirModalResumoLicitacaoVinculada(licitacaoId, botaoOrigem) {
       </div>
       <div class="corpo-modal">
         <p><strong>Modalidade:</strong> ${licitacao.modalidadeNome || "Não informada"}</p>
-        <p class="texto-secundario">${licitacao.objeto}</p>
+        <p class="texto-secundario">${escaparHtml(licitacao.objeto)}</p>
         <div class="lista-anexos-vinculados" style="border-top:none; padding-top:0; margin-top:12px">
           ${
             (licitacao.anexos || []).length === 0
@@ -452,7 +452,11 @@ async function renderizarLicitacoes(area) {
     document.getElementById("btn-carregar-mais").classList.add("oculto");
     lista.innerHTML = `<p class="texto-secundario">Filtrando...</p>`;
     try {
-      const snapshot = await colecaoEntidade("licitacoes").limit(5000).get();
+      const anoAtivo = document.getElementById("filtro-ano").value;
+      const consultaBase = anoAtivo
+        ? colecaoEntidade("licitacoes").where("ano", "==", parseInt(anoAtivo, 10))
+        : colecaoEntidade("licitacoes").limit(5000);
+      const snapshot = await consultaBase.get();
       let registros = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       if (numero) registros = registros.filter((r) => (r.numeroNormalizado || "").includes(numero));
       if (modalidadeId) registros = registros.filter((r) => r.modalidadeId === modalidadeId);
@@ -538,7 +542,7 @@ async function renderizarLicitacoes(area) {
         <input type="checkbox" class="checkbox-selecao-registro" title="Selecionar pra exportação em lote">
         <div>
           <strong>${registro.numero}/${registro.ano}</strong> — ${mapaModalidades[registro.modalidadeId] || "Modalidade não informada"}
-          <div class="texto-secundario">${registro.objeto}</div>
+          <div class="texto-secundario">${escaparHtml(registro.objeto)}</div>
           <div class="texto-secundario">${(registro.anexos || []).length} anexo(s)</div>
         </div>
       </div>
@@ -819,7 +823,11 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
     document.getElementById("btn-carregar-mais").classList.add("oculto");
     lista.innerHTML = `<p class="texto-secundario">Filtrando...</p>`;
     try {
-      const snapshot = await colecaoEntidade(nomeColecao).limit(5000).get();
+      const anoAtivo = document.getElementById("filtro-ano").value;
+      const consultaBase = anoAtivo
+        ? colecaoEntidade(nomeColecao).where("ano", "==", parseInt(anoAtivo, 10))
+        : colecaoEntidade(nomeColecao).limit(5000);
+      const snapshot = await consultaBase.get();
       let registros = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       if (numero) registros = registros.filter((r) => (r.numeroNormalizado || "").includes(numero));
       if (tipoId) registros = registros.filter((r) => r.tipoId === tipoId);
@@ -901,7 +909,7 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
         <input type="checkbox" class="checkbox-selecao-registro" title="Selecionar pra exportação em lote">
         <div>
           <strong>${mapaTipos[registro.tipoId] || "Tipo não informado"} nº ${registro.numero}${registro.ano ? "/" + registro.ano : ""}</strong>
-          <div class="texto-secundario">${registro.objeto}</div>
+          <div class="texto-secundario">${escaparHtml(registro.objeto)}</div>
           <div class="texto-secundario">${(registro.anexos || []).length} anexo(s)</div>
         </div>
       </div>
@@ -1166,7 +1174,11 @@ async function renderizarDespesas(area) {
     lista.innerHTML = `<p class="texto-secundario">Filtrando...</p>`;
 
     try {
-      const snapshot = await colecaoEntidade("processosDespesa").limit(5000).get();
+      const anoAtivo = document.getElementById("filtro-ano").value;
+      const consultaBase = anoAtivo
+        ? colecaoEntidade("processosDespesa").orderBy("competenciaKey").startAt(`${anoAtivo}-01`).endAt(`${anoAtivo}-12`)
+        : colecaoEntidade("processosDespesa").limit(5000);
+      const snapshot = await consultaBase.get();
       let registros = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
       if (filtros.numeroEmpenho) registros = registros.filter((r) => (r.numeroEmpenhoNormalizado || "").includes(filtros.numeroEmpenho));
@@ -1357,7 +1369,7 @@ async function renderizarDespesas(area) {
         <input type="checkbox" class="checkbox-selecao-registro" title="Selecionar pra exportação em lote">
         <div>
           <strong>Empenho ${registro.numeroEmpenho}</strong> — ${registro.credorNome || ""}
-          <div class="texto-secundario">${registro.objeto}</div>
+          <div class="texto-secundario">${escaparHtml(registro.objeto)}</div>
           <div class="texto-secundario">${formatarMoeda(registro.valor)} · Pagamento em ${formatarData(registro.dataPagamento)}</div>
           <div class="texto-secundario">Ordem de Pagamento: ${registro.ordemPagamento || "-"} · Elemento: <span class="num">${registro.elementoDespesa || "-"}</span></div>
           <div class="texto-secundario">${(registro.anexos || []).length} anexo(s)</div>
@@ -1879,11 +1891,22 @@ function configurarAutocomplete({ inputBusca, inputId, resultadosEl, buscar, rot
     }, 300);
   });
 
-  document.addEventListener("click", (evento) => {
+  // Antes, isso adicionava um listener em "document" TODA VEZ que um
+  // formulário com autocomplete era aberto, e nunca era removido — indo
+  // se acumulando ao longo da sessão (deixando o app cada vez mais
+  // lento quanto mais registros fossem abertos). Agora o próprio
+  // listener detecta quando o formulário já fechou (o elemento não
+  // está mais na tela) e se remove sozinho na primeira chance.
+  function aoClicarForaDoAutocomplete(evento) {
+    if (!document.body.contains(resultadosEl)) {
+      document.removeEventListener("click", aoClicarForaDoAutocomplete);
+      return;
+    }
     if (!resultadosEl.contains(evento.target) && evento.target !== inputBusca) {
       resultadosEl.classList.add("oculto");
     }
-  });
+  }
+  document.addEventListener("click", aoClicarForaDoAutocomplete);
 }
 
 /** Liga o campo de busca de uma lista paginada a uma consulta por prefixo normalizado */

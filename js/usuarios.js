@@ -158,7 +158,7 @@ async function renderizarUnidadesGestoras(area) {
   function criarCartao(registro) {
     const cartao = document.createElement("div");
     cartao.className = "cartao-registro cartao-clicavel";
-    cartao.innerHTML = `<div><strong>${registro.nome}</strong><div class="texto-secundario">${registro.cnpj || ""}</div></div>`;
+    cartao.innerHTML = `<div><strong>${registro.nome}</strong><div class="texto-secundario">${escaparHtml(registro.cnpj || "")}</div></div>`;
     cartao.addEventListener("click", () => abrirFormulario(registro));
     return cartao;
   }

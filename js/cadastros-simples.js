@@ -280,7 +280,7 @@ async function renderizarCredores(area) {
     cartao.innerHTML = `
       <div>
         <strong>${registro.nome}</strong>
-        <div class="texto-secundario">${registro.tipo === "PJ" ? "CNPJ" : "CPF"}: ${registro.documento}</div>
+        <div class="texto-secundario">${registro.tipo === "PJ" ? "CNPJ" : "CPF"}: ${escaparHtml(registro.documento)}</div>
       </div>
       ${
         usuarioPodeEditar()

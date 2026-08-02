@@ -3,10 +3,10 @@
 // Isso evita o problema clássico de PWA "preso" numa versão antiga
 // depois de uma atualização.
 
-const NOME_CACHE = "soft-indexacao-v68";
+const NOME_CACHE = "soft-indexacao-v69";
 const ARQUIVOS_ESSENCIAIS = [
   "./index.html",
-  "./css/estilos.css?v=68",
+  "./css/estilos.css?v=69",
   "./manifest.json",
   "./logo-horizontal.png",
   "./logo-simbolo.png",

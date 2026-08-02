@@ -210,6 +210,15 @@ está tudo certo.
 
 ## Changelog
 
+**v8.13** — A correção da v8.12 não bastou: havia um **segundo ponto**
+com o mesmo tipo de erro, esse dentro do laço que desenha cada anexo —
+o botão "Remover" (🗑️) também só existe pra quem edita, e o código
+tentava ligar o clique nele sem checar isso, quebrando **antes da
+linha do anexo ser inserida na tela**. Como isso acontecia pra cada
+anexo, a lista inteira ficava vazia pra usuário leitura. Corrigido, e
+feita uma varredura completa no arquivo pra confirmar que não sobrou
+mais nenhum caso parecido.
+
 **v8.12** — Corrigido bug real: usuário **somente leitura** não via
 **nenhum PDF** ao abrir um registro, mesmo quando o registro tinha
 anexo. Causa: o botão "+ Adicionar PDF" só existe no HTML pra quem

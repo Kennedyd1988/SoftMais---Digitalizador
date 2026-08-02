@@ -281,7 +281,7 @@ function renderizarSecaoAnexos(container, anexosIniciais, nomeModulo, aoMudar, o
               esconderBarra();
             }
           });
-          linha.querySelector('[data-acao="remover"]').addEventListener("click", async () => {
+          linha.querySelector('[data-acao="remover"]')?.addEventListener("click", async () => {
             if (!confirm(`Remover o anexo "${anexo.nomeArquivo}"?`)) return;
             try {
               await excluirAnexoDrive(anexo.driveFileId);

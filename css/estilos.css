@@ -72,6 +72,7 @@ h1, h2, h3 { font-family: 'Source Serif 4', serif; margin: 0 0 8px; }
 .logo-login-grande {
   height: 32px;
   width: auto;
+  align-self: flex-start; /* sem isso, o container flexível "estica" a imagem e ela fica achatada */
   filter: brightness(0) invert(1); /* a logo é azul — precisa virar branca em cima do fundo azul */
   margin-bottom: 12px;
 }

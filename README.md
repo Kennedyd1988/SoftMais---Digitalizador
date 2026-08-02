@@ -210,6 +210,11 @@ está tudo certo.
 
 ## Changelog
 
+**v8.10** — Corrigido: a logo grande do lado azul da tela de login
+ficava achatada — o container flexível estica os filhos por padrão pra
+ocupar toda a largura, e como a altura da imagem estava fixa em 32px,
+ela "esmagava" na horizontal. Corrigido com `align-self: flex-start`.
+
 **v8.9** — Tela de login redesenhada no layout dividido (mesmo padrão
 usado no app Financeiro de Igrejas): lado esquerdo azul com a logo
 SOFT+ **grande** (convertida pra branca automaticamente, já que o

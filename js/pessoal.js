@@ -66,7 +66,7 @@ async function renderizarServidores(area) {
 
   function criarCartao(registro) {
     const cartao = document.createElement("div");
-    cartao.className = "cartao-registro";
+    cartao.className = "cartao-registro cartao-clicavel";
     cartao.innerHTML = `
       <div>
         <strong>${registro.nome}</strong>
@@ -82,11 +82,13 @@ async function renderizarServidores(area) {
         }
       </div>
     `;
-    cartao.querySelector('[data-acao="ver-vinculados"]').addEventListener("click", (evento) =>
-      abrirModalVinculadosServidor(registro, evento.currentTarget)
-    );
-    cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", () => abrirFormulario(registro));
-    cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", () => excluirServidor(registro));
+    cartao.querySelector('[data-acao="ver-vinculados"]').addEventListener("click", (evento) => {
+      evento.stopPropagation();
+      abrirModalVinculadosServidor(registro, evento.currentTarget);
+    });
+    cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", (evento) => { evento.stopPropagation(); abrirFormulario(registro); });
+    cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) => { evento.stopPropagation(); excluirServidor(registro); });
+    cartao.addEventListener("click", () => abrirFormulario(registro));
     return cartao;
   }
 
@@ -202,7 +204,7 @@ async function renderizarFolhas(area) {
 
   function criarCartao(registro) {
     const cartao = document.createElement("div");
-    cartao.className = "cartao-registro";
+    cartao.className = "cartao-registro cartao-clicavel";
     cartao.innerHTML = `
       <div>
         <strong>${registro.nome}</strong>
@@ -218,11 +220,13 @@ async function renderizarFolhas(area) {
         }
       </div>
     `;
-    cartao.querySelector('[data-acao="ver-despesas"]').addEventListener("click", (evento) =>
-      abrirModalDespesasDaFolha(registro, evento.currentTarget)
-    );
-    cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", () => abrirFormulario(registro));
-    cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", () => excluirFolha(registro));
+    cartao.querySelector('[data-acao="ver-despesas"]').addEventListener("click", (evento) => {
+      evento.stopPropagation();
+      abrirModalDespesasDaFolha(registro, evento.currentTarget);
+    });
+    cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", (evento) => { evento.stopPropagation(); abrirFormulario(registro); });
+    cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) => { evento.stopPropagation(); excluirFolha(registro); });
+    cartao.addEventListener("click", () => abrirFormulario(registro));
     return cartao;
   }
 
@@ -399,6 +403,17 @@ async function renderizarProcessosPessoal(area) {
       <button type="button" class="botao-secundario" id="btn-filtro-sem-anexo">📋 Sem anexo</button>
       <button type="button" class="botao-secundario" id="btn-filtro-com-anexo">📎 Com anexo</button>
       <button type="button" class="botao-secundario" id="btn-selecionar-todos">☑️ Selecionar todos</button>
+      <button type="button" class="botao-secundario" id="btn-alternar-filtros-avancados">🔧 Filtros Avançados</button>
+    </div>
+    <div id="painel-filtros-avancados" class="cartao-manutencao oculto">
+      <div class="linha-formulario">
+        <div><label>Servidor</label><select id="fa-servidor"><option value="">Todos</option></select></div>
+        <div><label>Tipo de Documento</label><select id="fa-tipo"><option value="">Todos</option></select></div>
+      </div>
+      <label>Competência (mm/aaaa)</label>
+      <input type="month" id="fa-competencia">
+      <button class="botao-primario" id="btn-aplicar-filtros-avancados" style="margin-top:10px">Aplicar Filtros</button>
+      <button class="botao-secundario" id="btn-limpar-filtros-avancados">Limpar</button>
     </div>
     ${htmlBarraSelecaoExportacao()}
     <div id="lista-registros" class="lista-cartoes"></div>
@@ -409,6 +424,40 @@ async function renderizarProcessosPessoal(area) {
   const gerenciadorSelecao = criarGerenciadorSelecao("processos-pessoal");
   gerenciadorSelecao.ligarBotoes();
   const tipos = await carregarOpcoesSelect("tiposDocumentoPessoal");
+
+  carregarOpcoesSelect("servidores").then((servidores) => {
+    document.getElementById("fa-servidor").innerHTML += montarOpcoesHtml(servidores);
+  });
+  document.getElementById("fa-tipo").innerHTML += montarOpcoesHtml(tipos);
+  document.getElementById("btn-alternar-filtros-avancados").addEventListener("click", () => {
+    document.getElementById("painel-filtros-avancados").classList.toggle("oculto");
+  });
+  document.getElementById("btn-aplicar-filtros-avancados").addEventListener("click", async () => {
+    const servidorId = document.getElementById("fa-servidor").value;
+    const tipoId = document.getElementById("fa-tipo").value;
+    const competencia = document.getElementById("fa-competencia").value;
+    const lista = document.getElementById("lista-registros");
+    document.getElementById("btn-carregar-mais").classList.add("oculto");
+    lista.innerHTML = `<p class="texto-secundario">Filtrando...</p>`;
+    try {
+      const snapshot = await colecaoEntidade("processosPessoal").limit(5000).get();
+      let registros = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      if (servidorId) registros = registros.filter((r) => r.servidorId === servidorId);
+      if (tipoId) registros = registros.filter((r) => r.tipoId === tipoId);
+      if (competencia) registros = registros.filter((r) => r.competencia === competencia);
+      lista.innerHTML = "";
+      registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
+      if (registros.length === 0) lista.innerHTML = `<p class="texto-secundario">Nenhum resultado encontrado com esses filtros.</p>`;
+    } catch (erro) {
+      tratarErroConsultaFirestore(erro);
+    }
+  });
+  document.getElementById("btn-limpar-filtros-avancados").addEventListener("click", () => {
+    document.getElementById("fa-servidor").value = "";
+    document.getElementById("fa-tipo").value = "";
+    document.getElementById("fa-competencia").value = "";
+    carregarPagina(true);
+  });
 
   if (usuarioPodeEditar()) {
     const colunas = [
@@ -518,12 +567,10 @@ async function renderizarProcessosPessoal(area) {
       const doc = await colecaoEntidade("servidores").doc(registro.servidorId).get();
       if (doc.exists) abrirModalVinculadosServidor({ id: doc.id, ...doc.data() }, evento.currentTarget);
     });
-    cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", () => abrirFormulario(registro));
-    cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) => excluirRegistro(registro, evento.target));
-    if (!usuarioPodeEditar()) {
-      cartao.classList.add("cartao-clicavel");
-      cartao.addEventListener("click", () => abrirFormulario(registro));
-    }
+    cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", (evento) => { evento.stopPropagation(); abrirFormulario(registro); });
+    cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) => { evento.stopPropagation(); excluirRegistro(registro, evento.target); });
+    cartao.classList.add("cartao-clicavel");
+    cartao.addEventListener("click", () => abrirFormulario(registro));
     return cartao;
   }
 
@@ -546,7 +593,7 @@ async function renderizarProcessosPessoal(area) {
           <input type="month" id="campo-competencia" value="${registro?.competencia || ""}">
         </div>
         <div>
-          <label>Exercício *</label>
+          <label>Exercício</label>
           <input type="number" id="campo-exercicio" value="${registro?.exercicio || new Date().getFullYear()}">
         </div>
       </div>
@@ -562,8 +609,7 @@ async function renderizarProcessosPessoal(area) {
 
       let valido = true;
       if (!campoTipo.value) { marcarCampoInvalido(campoTipo, "Selecione o tipo."); valido = false; }
-      if (!campoExercicio.value) { marcarCampoInvalido(campoExercicio, "Informe o exercício."); valido = false; }
-      if (!valido) return;
+            if (!valido) return;
 
       await executarComFeedback(botaoSalvar, async () => {
         const servidorNome = document.getElementById("campo-servidor-busca").value.trim();
@@ -576,7 +622,7 @@ async function renderizarProcessosPessoal(area) {
           servidorNome: servidorNome || null,
           servidorNomeNormalizado: servidorNome ? normalizarTexto(servidorNome) : null,
           competencia: document.getElementById("campo-competencia").value || null,
-          exercicio: parseInt(campoExercicio.value, 10),
+          exercicio: campoExercicio.value ? parseInt(campoExercicio.value, 10) : null,
           observacoes,
           observacoesNormalizado: normalizarTexto(observacoes),
           anexos: controleAnexos.obterAnexos(),
@@ -715,6 +761,17 @@ async function renderizarAtosAdministrativos(area) {
       <button type="button" class="botao-secundario" id="btn-filtro-sem-anexo">📋 Sem anexo</button>
       <button type="button" class="botao-secundario" id="btn-filtro-com-anexo">📎 Com anexo</button>
       <button type="button" class="botao-secundario" id="btn-selecionar-todos">☑️ Selecionar todos</button>
+      <button type="button" class="botao-secundario" id="btn-alternar-filtros-avancados">🔧 Filtros Avançados</button>
+    </div>
+    <div id="painel-filtros-avancados" class="cartao-manutencao oculto">
+      <div class="linha-formulario">
+        <div><label>Número</label><input type="text" id="fa-numero"></div>
+        <div><label>Tipo do Ato</label><select id="fa-tipo"><option value="">Todos</option></select></div>
+      </div>
+      <label>Servidor Envolvido</label>
+      <select id="fa-servidor"><option value="">Todos</option></select>
+      <button class="botao-primario" id="btn-aplicar-filtros-avancados" style="margin-top:10px">Aplicar Filtros</button>
+      <button class="botao-secundario" id="btn-limpar-filtros-avancados">Limpar</button>
     </div>
     ${htmlBarraSelecaoExportacao()}
     <div id="lista-registros" class="lista-cartoes"></div>
@@ -725,6 +782,40 @@ async function renderizarAtosAdministrativos(area) {
   const gerenciadorSelecao = criarGerenciadorSelecao("atos-administrativos");
   gerenciadorSelecao.ligarBotoes();
   const tipos = await carregarOpcoesSelect("tiposAtoAdministrativo");
+
+  carregarOpcoesSelect("servidores").then((servidores) => {
+    document.getElementById("fa-servidor").innerHTML += montarOpcoesHtml(servidores);
+  });
+  document.getElementById("fa-tipo").innerHTML += montarOpcoesHtml(tipos);
+  document.getElementById("btn-alternar-filtros-avancados").addEventListener("click", () => {
+    document.getElementById("painel-filtros-avancados").classList.toggle("oculto");
+  });
+  document.getElementById("btn-aplicar-filtros-avancados").addEventListener("click", async () => {
+    const numero = normalizarTexto(document.getElementById("fa-numero").value.trim());
+    const tipoId = document.getElementById("fa-tipo").value;
+    const servidorId = document.getElementById("fa-servidor").value;
+    const lista = document.getElementById("lista-registros");
+    document.getElementById("btn-carregar-mais").classList.add("oculto");
+    lista.innerHTML = `<p class="texto-secundario">Filtrando...</p>`;
+    try {
+      const snapshot = await colecaoEntidade("atosAdministrativos").limit(5000).get();
+      let registros = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      if (numero) registros = registros.filter((r) => (r.numeroNormalizado || "").includes(numero));
+      if (tipoId) registros = registros.filter((r) => r.tipoId === tipoId);
+      if (servidorId) registros = registros.filter((r) => (r.servidoresIds || []).includes(servidorId));
+      lista.innerHTML = "";
+      registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
+      if (registros.length === 0) lista.innerHTML = `<p class="texto-secundario">Nenhum resultado encontrado com esses filtros.</p>`;
+    } catch (erro) {
+      tratarErroConsultaFirestore(erro);
+    }
+  });
+  document.getElementById("btn-limpar-filtros-avancados").addEventListener("click", () => {
+    document.getElementById("fa-numero").value = "";
+    document.getElementById("fa-tipo").value = "";
+    document.getElementById("fa-servidor").value = "";
+    carregarPagina(true);
+  });
 
   if (usuarioPodeEditar()) {
     const colunas = [
@@ -832,12 +923,10 @@ async function renderizarAtosAdministrativos(area) {
     cartao.querySelector(".checkbox-selecao-registro").addEventListener("change", (evento) =>
       gerenciadorSelecao.alternarSelecao(registro, evento.target.checked)
     );
-    cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", () => abrirFormulario(registro));
-    cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) => excluirRegistro(registro, evento.target));
-    if (!usuarioPodeEditar()) {
-      cartao.classList.add("cartao-clicavel");
-      cartao.addEventListener("click", () => abrirFormulario(registro));
-    }
+    cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", (evento) => { evento.stopPropagation(); abrirFormulario(registro); });
+    cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) => { evento.stopPropagation(); excluirRegistro(registro, evento.target); });
+    cartao.classList.add("cartao-clicavel");
+    cartao.addEventListener("click", () => abrirFormulario(registro));
     return cartao;
   }
 
@@ -861,7 +950,7 @@ async function renderizarAtosAdministrativos(area) {
       </div>
       <div class="linha-formulario">
         <div>
-          <label>Exercício *</label>
+          <label>Exercício</label>
           <input type="number" id="campo-exercicio" value="${registro?.exercicio || new Date().getFullYear()}">
         </div>
         <div>
@@ -897,8 +986,7 @@ async function renderizarAtosAdministrativos(area) {
       let valido = true;
       if (!campoTipo.value) { marcarCampoInvalido(campoTipo, "Selecione o tipo."); valido = false; }
       if (!campoNumero.value.trim()) { marcarCampoInvalido(campoNumero, "Informe o número."); valido = false; }
-      if (!campoExercicio.value) { marcarCampoInvalido(campoExercicio, "Informe o exercício."); valido = false; }
-      if (!campoDescricao.value.trim()) { marcarCampoInvalido(campoDescricao, "Informe a descrição."); valido = false; }
+            if (!campoDescricao.value.trim()) { marcarCampoInvalido(campoDescricao, "Informe a descrição."); valido = false; }
       if (!valido) return;
 
       await executarComFeedback(botaoSalvar, async () => {
@@ -913,7 +1001,7 @@ async function renderizarAtosAdministrativos(area) {
           tipoNomeNormalizado: normalizarTexto(tipos.find((t) => t.id === campoTipo.value)?.nome || ""),
           numero: campoNumero.value.trim(),
           numeroNormalizado: normalizarTexto(campoNumero.value),
-          exercicio: parseInt(campoExercicio.value, 10),
+          exercicio: campoExercicio.value ? parseInt(campoExercicio.value, 10) : null,
           competencia: document.getElementById("campo-competencia").value || null,
           dataEmissao: document.getElementById("campo-data-emissao").value || null,
           descricao,

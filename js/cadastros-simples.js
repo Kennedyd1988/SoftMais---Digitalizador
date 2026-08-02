@@ -44,7 +44,7 @@ async function renderizarCadastroSimples(area, nomeColecao, rotuloSingular, opco
 
   function criarCartaoSimples(registro) {
     const cartao = document.createElement("div");
-    cartao.className = "cartao-registro";
+    cartao.className = "cartao-registro cartao-clicavel";
     cartao.innerHTML = `
       <span>${opcoesCampoCodigo && registro.codigo ? `<span class="num">${registro.codigo}</span> — ` : ""}${registro.nome}</span>
       ${
@@ -56,12 +56,15 @@ async function renderizarCadastroSimples(area, nomeColecao, rotuloSingular, opco
           : ""
       }
     `;
-    cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", () =>
-      abrirFormulario(registro)
-    );
-    cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", () =>
-      excluirRegistro(registro)
-    );
+    cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", (evento) => {
+      evento.stopPropagation();
+      abrirFormulario(registro);
+    });
+    cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) => {
+      evento.stopPropagation();
+      excluirRegistro(registro);
+    });
+    cartao.addEventListener("click", () => abrirFormulario(registro));
     return cartao;
   }
 
@@ -273,7 +276,7 @@ async function renderizarCredores(area) {
 
   function criarCartaoCredor(registro) {
     const cartao = document.createElement("div");
-    cartao.className = "cartao-registro";
+    cartao.className = "cartao-registro cartao-clicavel";
     cartao.innerHTML = `
       <div>
         <strong>${registro.nome}</strong>
@@ -288,8 +291,15 @@ async function renderizarCredores(area) {
           : ""
       }
     `;
-    cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", () => abrirFormulario(registro));
-    cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", () => excluirCredor(registro));
+    cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", (evento) => {
+      evento.stopPropagation();
+      abrirFormulario(registro);
+    });
+    cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) => {
+      evento.stopPropagation();
+      excluirCredor(registro);
+    });
+    cartao.addEventListener("click", () => abrirFormulario(registro));
     return cartao;
   }
 
@@ -427,6 +437,7 @@ async function renderizarCredores(area) {
 // MODAL GENÉRICO (usado por todos os formulários do app)
 // ===================================================================
 function criarModal(titulo, corpoHtml, aoSalvar, aoExcluir = null) {
+  const podeEditar = usuarioPodeEditar();
   const fundo = document.createElement("div");
   fundo.className = "fundo-modal";
   fundo.id = "fundo-modal-ativo";
@@ -438,10 +449,10 @@ function criarModal(titulo, corpoHtml, aoSalvar, aoExcluir = null) {
       </div>
       <div class="corpo-modal">${corpoHtml}</div>
       <div class="rodape-modal">
-        ${aoExcluir ? `<button class="botao-perigo" id="btn-excluir-modal">🗑️ Excluir</button>` : ""}
+        ${aoExcluir && podeEditar ? `<button class="botao-perigo" id="btn-excluir-modal">🗑️ Excluir</button>` : ""}
         <div class="rodape-modal-direita">
-          <button class="botao-secundario" id="btn-cancelar-modal">Cancelar</button>
-          <button class="botao-primario" id="btn-salvar-modal">Salvar</button>
+          <button class="botao-secundario" id="btn-cancelar-modal">${podeEditar ? "Cancelar" : "Fechar"}</button>
+          ${podeEditar ? `<button class="botao-primario" id="btn-salvar-modal">Salvar</button>` : ""}
         </div>
       </div>
     </div>
@@ -449,13 +460,22 @@ function criarModal(titulo, corpoHtml, aoSalvar, aoExcluir = null) {
   document.body.appendChild(fundo);
   document.getElementById("btn-fechar-modal").addEventListener("click", fecharModal);
   document.getElementById("btn-cancelar-modal").addEventListener("click", fecharModal);
-  document.getElementById("btn-salvar-modal").addEventListener("click", (evento) =>
-    aoSalvar(evento.target)
-  );
-  if (aoExcluir) {
-    document.getElementById("btn-excluir-modal").addEventListener("click", (evento) =>
-      aoExcluir(evento.target)
+  if (podeEditar) {
+    document.getElementById("btn-salvar-modal").addEventListener("click", (evento) =>
+      aoSalvar(evento.target)
     );
+    if (aoExcluir) {
+      document.getElementById("btn-excluir-modal").addEventListener("click", (evento) =>
+        aoExcluir(evento.target)
+      );
+    }
+  } else {
+    // Modo somente leitura: trava todos os campos do formulário (menos
+    // os que já são inerentemente de busca/ação, como campo de anexo,
+    // que já vem escondido nesse modo)
+    fundo.querySelectorAll(".corpo-modal input, .corpo-modal select, .corpo-modal textarea").forEach((campo) => {
+      campo.disabled = true;
+    });
   }
   return fundo;
 }

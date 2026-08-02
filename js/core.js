@@ -7,7 +7,7 @@
 // e na tela de login, para facilitar conferir se o navegador já está
 // com a versão mais recente (ajuda a identificar problema de cache).
 // ===================================================================
-const VERSAO_APP = "7.16";
+const VERSAO_APP = "8.5";
 document.addEventListener("DOMContentLoaded", () => {
   const elementoLogin = document.getElementById("versao-app-login");
   if (elementoLogin) elementoLogin.textContent = `v${VERSAO_APP}`;
@@ -359,28 +359,28 @@ function abrirAppComEntidade(entidade) {
 // -------------------------------------------------------------
 
 const ITENS_MENU = [
-  { chave: "inicio", rotulo: "Início", icone: "🏠", modulo: null },
-  { chave: "credores", rotulo: "Credores/Fornecedores", icone: "🧾", modulo: "credores" },
-  { chave: "licitacoes", rotulo: "Licitações", icone: "📑", modulo: "licitacoes" },
-  { chave: "despesas", rotulo: "Processos de Despesa", icone: "💰", modulo: "despesas" },
-  { chave: "legislacao", rotulo: "Legislação", icone: "⚖️", modulo: "legislacao" },
-  { chave: "documentos-diversos", rotulo: "Documentos Diversos", icone: "📂", modulo: "documentosDiversos" },
-  { chave: "servidores", rotulo: "Servidores", icone: "👥", modulo: "servidores" },
-  { chave: "folhas", rotulo: "Folhas", icone: "📋", modulo: "folhas" },
-  { chave: "processos-pessoal", rotulo: "Processos de Pessoal", icone: "🧑‍💼", modulo: "processosPessoal" },
-  { chave: "atos-administrativos", rotulo: "Atos Administrativos", icone: "📜", modulo: "atosAdministrativos" },
-  { chave: "relatorios", rotulo: "Relatórios", icone: "📊", modulo: "relatorios" },
-  { chave: "relatorios-detalhados", rotulo: "Relatórios Detalhados", icone: "🔎", modulo: "relatorios" },
-  { chave: "modalidades-licitacao", rotulo: "Modalidades de Licitação", icone: "⚙️", modulo: "config" },
-  { chave: "unidades-orcamentarias", rotulo: "Unidades Orçamentárias", icone: "⚙️", modulo: "config" },
-  { chave: "fontes-recurso", rotulo: "Fontes de Recurso", icone: "⚙️", modulo: "config" },
-  { chave: "tipos-documento", rotulo: "Tipos de Documento", icone: "⚙️", modulo: "config" },
-  { chave: "tipos-documento-pessoal", rotulo: "Tipos de Documento de Pessoal", icone: "⚙️", modulo: "config" },
-  { chave: "tipos-ato-administrativo", rotulo: "Tipos de Ato Administrativo", icone: "⚙️", modulo: "config" },
-  { chave: "usuarios", rotulo: "Usuários", icone: "👤", modulo: "usuarios", somenteAdmin: true },
-  { chave: "unidades-gestoras", rotulo: "Unidades Gestoras", icone: "🏢", modulo: "unidadesGestoras", somenteAdmin: true },
-  { chave: "manutencao", rotulo: "Manutenção", icone: "🔧", modulo: "manutencao", somenteAdmin: true },
-  { chave: "historico", rotulo: "Histórico", icone: "🕒", modulo: "historico", somenteAdmin: true },
+  { chave: "inicio", rotulo: "Início", icone: "🏠", modulo: null, grupo: null },
+  { chave: "credores", rotulo: "Credores/Fornecedores", icone: "🧾", modulo: "credores", grupo: "Financeiro" },
+  { chave: "licitacoes", rotulo: "Licitações", icone: "📑", modulo: "licitacoes", grupo: "Financeiro" },
+  { chave: "despesas", rotulo: "Processos de Despesa", icone: "💰", modulo: "despesas", grupo: "Financeiro" },
+  { chave: "legislacao", rotulo: "Legislação", icone: "⚖️", modulo: "legislacao", grupo: "Financeiro" },
+  { chave: "documentos-diversos", rotulo: "Documentos Diversos", icone: "📂", modulo: "documentosDiversos", grupo: "Financeiro" },
+  { chave: "servidores", rotulo: "Servidores", icone: "👥", modulo: "servidores", grupo: "Recursos Humanos" },
+  { chave: "folhas", rotulo: "Folhas", icone: "📋", modulo: "folhas", grupo: "Recursos Humanos" },
+  { chave: "processos-pessoal", rotulo: "Processos de Pessoal", icone: "🧑‍💼", modulo: "processosPessoal", grupo: "Recursos Humanos" },
+  { chave: "atos-administrativos", rotulo: "Atos Administrativos", icone: "📜", modulo: "atosAdministrativos", grupo: "Recursos Humanos" },
+  { chave: "relatorios", rotulo: "Relatórios", icone: "📊", modulo: "relatorios", grupo: "Relatórios" },
+  { chave: "relatorios-detalhados", rotulo: "Relatórios Detalhados", icone: "🔎", modulo: "relatorios", grupo: "Relatórios" },
+  { chave: "modalidades-licitacao", rotulo: "Modalidades de Licitação", icone: "⚙️", modulo: "config", grupo: "Cadastros de Apoio" },
+  { chave: "unidades-orcamentarias", rotulo: "Unidades Orçamentárias", icone: "⚙️", modulo: "config", grupo: "Cadastros de Apoio" },
+  { chave: "fontes-recurso", rotulo: "Fontes de Recurso", icone: "⚙️", modulo: "config", grupo: "Cadastros de Apoio" },
+  { chave: "tipos-documento", rotulo: "Tipos de Documento", icone: "⚙️", modulo: "config", grupo: "Cadastros de Apoio" },
+  { chave: "tipos-documento-pessoal", rotulo: "Tipos de Documento de Pessoal", icone: "⚙️", modulo: "config", grupo: "Cadastros de Apoio" },
+  { chave: "tipos-ato-administrativo", rotulo: "Tipos de Ato Administrativo", icone: "⚙️", modulo: "config", grupo: "Cadastros de Apoio" },
+  { chave: "usuarios", rotulo: "Usuários", icone: "👤", modulo: "usuarios", somenteAdmin: true, grupo: "Administração" },
+  { chave: "unidades-gestoras", rotulo: "Unidades Gestoras", icone: "🏢", modulo: "unidadesGestoras", somenteAdmin: true, grupo: "Administração" },
+  { chave: "manutencao", rotulo: "Manutenção", icone: "🔧", modulo: "manutencao", somenteAdmin: true, grupo: "Administração" },
+  { chave: "historico", rotulo: "Histórico", icone: "🕒", modulo: "historico", somenteAdmin: true, grupo: "Administração" },
 ];
 
 let paginaAtual = "inicio";
@@ -398,6 +398,9 @@ function montarMenuLateral() {
   const menu = document.getElementById("menu-lateral");
   menu.innerHTML = "";
 
+  let grupoAtual = undefined; // undefined != null, força criar o cabeçalho do primeiro grupo
+  let containerGrupoAtual = menu;
+
   ITENS_MENU.forEach((item) => {
     if (item.somenteAdmin && !usuarioEhAdministrador()) return;
     if (item.modulo === "config" && !usuarioEhAdministrador() && !usuarioPodeEditar()) return;
@@ -405,12 +408,36 @@ function montarMenuLateral() {
       if (!usuarioTemAcessoAba(item.modulo)) return;
     }
 
+    if (item.grupo !== grupoAtual) {
+      grupoAtual = item.grupo;
+      if (grupoAtual) {
+        const cabecalho = document.createElement("button");
+        cabecalho.type = "button";
+        cabecalho.className = "grupo-menu";
+        cabecalho.innerHTML = `<span class="seta-grupo-menu">▶</span> ${grupoAtual}`;
+
+        const containerItens = document.createElement("div");
+        containerItens.className = "itens-grupo-menu oculto"; // começa recolhido
+
+        cabecalho.addEventListener("click", () => {
+          const recolhido = containerItens.classList.toggle("oculto");
+          cabecalho.querySelector(".seta-grupo-menu").textContent = recolhido ? "▶" : "▼";
+        });
+
+        menu.appendChild(cabecalho);
+        menu.appendChild(containerItens);
+        containerGrupoAtual = containerItens;
+      } else {
+        containerGrupoAtual = menu; // itens sem grupo (ex: Início) ficam soltos, fora de qualquer grupo recolhível
+      }
+    }
+
     const botao = document.createElement("button");
     botao.className = "item-menu";
     botao.dataset.chave = item.chave;
     botao.innerHTML = `<span class="icone-menu">${item.icone}</span> ${item.rotulo}`;
     botao.addEventListener("click", () => navegarPara(item.chave));
-    menu.appendChild(botao);
+    containerGrupoAtual.appendChild(botao);
   });
 
   const rodapeVersao = document.createElement("div");
@@ -513,10 +540,14 @@ function navegarPara(chave) {
 }
 
 async function renderizarInicio(area) {
+  const logoEntidade = estado.entidadeAtualDados?.logoBase64;
   area.innerHTML = `
     <div class="cartao-boas-vindas">
-      <h2>Bem-vindo(a), ${estado.dadosUsuario.nome || estado.usuario.email}</h2>
-      <p>Unidade gestora atual: <strong>${estado.entidadeAtualNome}</strong></p>
+      ${logoEntidade ? `<img src="${logoEntidade}" alt="Logo" class="logo-boas-vindas">` : ""}
+      <div>
+        <h2>Bem-vindo(a), ${estado.dadosUsuario.nome || estado.usuario.email}</h2>
+        <p>Unidade gestora atual: <strong>${estado.entidadeAtualNome}</strong></p>
+      </div>
     </div>
     <div id="area-dashboard"><p class="texto-secundario" style="margin-top:16px">Calculando resumo do ano...</p></div>
   `;
@@ -702,12 +733,29 @@ async function renderizarHistorico(area) {
         <option value="processosPessoal">Processos de Pessoal</option>
         <option value="atosAdministrativos">Atos Administrativos</option>
       </select>
+      <select id="historico-filtro-usuario" class="filtro-ano"><option value="">Todos os usuários</option></select>
+    </div>
+    <div class="barra-busca">
+      <div><label class="rotulo-inline">Período — de</label><input type="date" id="historico-filtro-data-de"></div>
+      <div><label class="rotulo-inline">até</label><input type="date" id="historico-filtro-data-ate"></div>
+      <button type="button" class="botao-secundario" id="historico-btn-limpar">Limpar filtros</button>
     </div>
     <div id="lista-registros" class="lista-cartoes"></div>
     <button id="btn-carregar-mais" class="botao-secundario oculto">Carregar mais</button>
   `;
 
   let paginador = criarPaginador(colecaoEntidade("historico").orderBy("dataHora", "desc"));
+
+  // Carrega os usuários pra popular o filtro (só quem tem acesso a esta unidade gestora aparece de fato usado, mas listar todos é suficiente aqui)
+  db.collection("usuarios").orderBy("nomeNormalizado").get().then((snapshot) => {
+    const seletor = document.getElementById("historico-filtro-usuario");
+    snapshot.docs.forEach((doc) => {
+      const opcao = document.createElement("option");
+      opcao.value = doc.data().email;
+      opcao.textContent = doc.data().nome || doc.data().email;
+      seletor.appendChild(opcao);
+    });
+  });
 
   function formatarDataHora(timestamp) {
     if (!timestamp?.toDate) return "-";
@@ -746,12 +794,60 @@ async function renderizarHistorico(area) {
   }
 
   document.getElementById("btn-carregar-mais").addEventListener("click", () => carregarPagina(false));
-  document.getElementById("historico-filtro-colecao").addEventListener("change", (evento) => {
-    const colecaoEscolhida = evento.target.value;
-    const consulta = colecaoEscolhida
-      ? colecaoEntidade("historico").where("colecao", "==", colecaoEscolhida).orderBy("dataHora", "desc")
-      : colecaoEntidade("historico").orderBy("dataHora", "desc");
-    paginador = criarPaginador(consulta);
+
+  async function aplicarFiltrosHistorico() {
+    const colecaoEscolhida = document.getElementById("historico-filtro-colecao").value;
+    const usuarioEscolhido = document.getElementById("historico-filtro-usuario").value;
+    const dataDe = document.getElementById("historico-filtro-data-de").value;
+    const dataAte = document.getElementById("historico-filtro-data-ate").value;
+
+    // Sem período: usa o padrão de paginação normal (com filtro de
+    // coleção no servidor, se marcado), e filtra usuário no cliente.
+    if (!dataDe && !dataAte) {
+      const consultaBase = colecaoEscolhida
+        ? colecaoEntidade("historico").where("colecao", "==", colecaoEscolhida).orderBy("dataHora", "desc")
+        : colecaoEntidade("historico").orderBy("dataHora", "desc");
+      paginador = criarPaginador(consultaBase);
+      if (!usuarioEscolhido) {
+        carregarPagina(true);
+        return;
+      }
+    }
+
+    // Com período (ou usuário sem período): busca um lote bem maior e
+    // filtra tudo no cliente, já que combinar range de data com outros
+    // filtros de igualdade pediria índice composto.
+    const lista = document.getElementById("lista-registros");
+    document.getElementById("btn-carregar-mais").classList.add("oculto");
+    lista.innerHTML = `<p class="texto-secundario">Filtrando...</p>`;
+
+    try {
+      let consulta = colecaoEntidade("historico").orderBy("dataHora", "desc").limit(2000);
+      const snapshot = await consulta.get();
+      let registros = snapshot.docs.map((doc) => doc.data());
+
+      if (colecaoEscolhida) registros = registros.filter((r) => r.colecao === colecaoEscolhida);
+      if (usuarioEscolhido) registros = registros.filter((r) => r.usuarioEmail === usuarioEscolhido);
+      if (dataDe) registros = registros.filter((r) => r.dataHora?.toDate && r.dataHora.toDate() >= new Date(dataDe + "T00:00:00"));
+      if (dataAte) registros = registros.filter((r) => r.dataHora?.toDate && r.dataHora.toDate() <= new Date(dataAte + "T23:59:59"));
+
+      lista.innerHTML = "";
+      registros.forEach((item) => lista.appendChild(criarCartaoHistorico(item)));
+      if (registros.length === 0) lista.innerHTML = `<p class="texto-secundario">Nenhuma alteração encontrada com esses filtros.</p>`;
+    } catch (erro) {
+      tratarErroConsultaFirestore(erro);
+    }
+  }
+
+  ["historico-filtro-colecao", "historico-filtro-usuario", "historico-filtro-data-de", "historico-filtro-data-ate"].forEach((id) => {
+    document.getElementById(id).addEventListener("change", aplicarFiltrosHistorico);
+  });
+  document.getElementById("historico-btn-limpar").addEventListener("click", () => {
+    document.getElementById("historico-filtro-colecao").value = "";
+    document.getElementById("historico-filtro-usuario").value = "";
+    document.getElementById("historico-filtro-data-de").value = "";
+    document.getElementById("historico-filtro-data-ate").value = "";
+    paginador = criarPaginador(colecaoEntidade("historico").orderBy("dataHora", "desc"));
     carregarPagina(true);
   });
 

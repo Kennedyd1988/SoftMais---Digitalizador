@@ -210,6 +210,114 @@ está tudo certo.
 
 ## Changelog
 
+**v8.5** — Verificação da reorganização de Volumes: a renomeação no
+Drive funciona corretamente, inclusive quando dois anexos são movidos
+pro mesmo volume ao mesmo tempo (nomes ficam únicos, sem colidir). Mas
+achei um detalhe importante que já existia (não é bug novo): igual
+acontece ao adicionar um anexo, a mudança só é gravada no **registro**
+quando o formulário inteiro é salvo — o arquivo já fica renomeado no
+Drive na hora, mas o vínculo no banco de dados só atualiza depois do
+"Salvar" do formulário. Adicionado um aviso claro na tela de
+reorganização pra deixar isso explícito, evitando confusão.
+
+**v8.4** — Corrigido o PDF dos Relatórios Detalhados cortando texto:
+as colunas tinham todas a mesma largura, então "Objeto" (texto longo)
+ficava espremido e vazava por cima da coluna "Anexos". Agora as
+colunas com texto tipicamente longo (Objeto, Descrição, Credor,
+Servidor, Folha, Licitação, Empenho) ganham mais espaço automaticamente,
+e o texto quebra linha de verdade dentro da própria coluna, em vez de
+só cortar em 40 caracteres.
+
+**v8.3** — Corrigido: o botão "📦 Baixar Volumes (.zip)" só aparecia
+quando o registro tinha mais de um **Volume diferente** — se tivesse
+2 PDFs dentro do MESMO Volume, o botão ficava escondido. Agora considera
+a quantidade total de PDFs, não só de Volumes, e continua confirmado
+visível tanto pra quem edita quanto pra quem só visualiza.
+
+**v8.2** — Duas correções:
+- **Relatórios Detalhados não exportava em PDF**: bug real — faltava
+  extrair `jsPDF` de `window.jspdf` antes de usar (o arquivo novo
+  esqueceu esse passo que os outros relatórios já tinham). Corrigido.
+- **Menu lateral**: os grupos agora começam **recolhidos**, com uma
+  seta (▶/▼) pra expandir/recolher clicando no nome do grupo. "Início"
+  fica sempre visível, fora de qualquer grupo.
+
+**v8.1** — Conclui a leva de melhorias da v8.0, mais 3 pedidos novos:
+
+**Item 5** — Relatórios Detalhados: filtros de Modalidade/Licitação/
+Folha/Credor/Unidade/Tipo/Servidor viraram campos de busca com múltipla
+seleção (checkbox), mostrando informação extra (CNPJ do credor,
+matrícula do servidor, modalidade da licitação) pra não deixar dúvida
+de qual registro é qual.
+
+**Item 8** — Manutenção dividida em 4 abas (já entregue na v8.0).
+
+**Item 9** — Filtros avançados (um campo por dado do formulário)
+implementados em **todos os 6 módulos**: Processos de Despesa
+(Empenho, Ordem de Pagamento, Credor, Unidade Orçamentária, Fonte de
+Recurso, Elemento de Despesa, faixa de Valor, faixa de Data),
+Licitações (Número, Modalidade), Legislação e Documentos Diversos
+(Número, Tipo), Processos de Pessoal (Servidor, Tipo, Competência) e
+Atos Administrativos (Número, Tipo, Servidor Envolvido). Ficam
+escondidos atrás de um botão "🔧 Filtros Avançados", pra não poluir a
+tela de quem só usa a busca simples.
+
+**Item 10** — Auditoria final: conferido que todo botão de excluir, de
+"+ Novo", de importar planilha e de adicionar/remover anexo está
+escondido pra usuário somente leitura — nenhuma lacuna encontrada além
+das já corrigidas na v8.0.
+
+**Item novo 1** — 🔀 Reorganizar Volumes: no formulário de qualquer
+registro com anexo, dá pra mudar o número do Volume de cada PDF — o
+app renomeia o arquivo no Drive automaticamente pra refletir a nova
+organização (troca só a parte "-VolN" do nome, mantendo o resto).
+
+**Item novo 2** — 📦 Baixar Volumes (.zip): botão que aparece
+automaticamente no formulário de anexos quando o registro tem mais de
+1 volume, baixando tudo consolidado num único .zip.
+
+**Item novo 3** — Histórico de Alterações ganhou filtro por Usuário e
+por Período (data de/até), além do filtro por tipo de registro que já
+existia.
+
+**v8.0** — Primeira leva de 14 melhorias pedidas (9 concluídas, 5 em
+andamento):
+1. ✅ Relatórios Detalhados: exportação em PDF com o mesmo cabeçalho
+   (logo + dados da unidade gestora) usado no Relatório Anual.
+2. ✅ Menu lateral agrupado em seções (Financeiro, Recursos Humanos,
+   Relatórios, Cadastros de Apoio, Administração), em vez de tudo
+   empilhado.
+3. ✅ Logo da unidade gestora aparece no card de boas-vindas da Início.
+4. ✅ Campo do nome da unidade gestora no cabeçalho ficou bem mais
+   largo (220px → 420px), com espaço extra liberado no celular.
+6. ✅ "Esqueci minha senha" na tela de login (envia e-mail de
+   redefinição via Firebase Auth).
+7. ✅ Tela de login com descrição do que o sistema faz, título próprio.
+11. ✅ Clicar em qualquer parte do cartão (não só no lápis) agora abre
+   o registro, em todos os módulos.
+13. ✅ Fontes oficiais (Inter/Source Serif 4/IBM Plex Mono) — já
+   estavam aplicadas corretamente, conferido.
+14. ✅ Ícone de "visualizar" trocado de 👁️ pra 🔍 em todo o app.
+
+Além disso, dois ajustes de segurança que a mudança do item 11 exigiu:
+- Usuário "somente leitura" agora vê o formulário travado (campos
+  desabilitados, sem botão Salvar/Excluir) ao abrir um registro pelo
+  cartão — antes só o botão de editar era escondido, mas com o cartão
+  inteiro virando clicável isso deixou de ser suficiente.
+- Botões de adicionar/remover anexo dentro do formulário também
+  passaram a respeitar a permissão de somente leitura (não estavam
+  escondidos antes).
+- Campos que costumam ficar em branco em dados migrados de sistemas
+  antigos (Ordem de Pagamento, Elemento de Despesa, Data de Pagamento,
+  Valor em Despesas; Exercício em Pessoal/Atos Administrativos) agora
+  são opcionais, não travam mais o salvamento.
+
+**Ainda faltam** (itens 5, 8, 9, 10 parcial): filtros de busca mais
+ricos nos Relatórios Detalhados (com múltipla seleção), abas dentro da
+tela de Manutenção, um campo de filtro por cada campo de formulário em
+cada módulo, e uma auditoria final dos botões de inserção/edição pra
+usuário somente leitura.
+
 **v7.16** — Corrigido bug real (provável causa da confusão "migração diz
 que já existe, varredura diz que não existe"): as consultas que checam
 "esse registro já existe?" podiam estar lendo do **cache local** do

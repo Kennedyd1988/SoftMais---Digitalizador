@@ -167,7 +167,7 @@ function htmlLinhaAnexoSomenteLeitura(anexo) {
       <div class="linha-anexo">
         <span class="nome-anexo">📄 ${anexo.nomeArquivo} <span class="texto-secundario">(${anexo.paginas ?? "?"} pág. · ${formatarTamanhoArquivo(anexo.tamanhoBytes)})</span></span>
         <div class="acoes-anexo">
-          <button type="button" class="botao-icone" title="Visualizar" data-acao="ver-anexo" data-id="${anexo.driveFileId}" data-nome="${anexo.nomeArquivo}">👁️</button>
+          <button type="button" class="botao-icone" title="Visualizar" data-acao="ver-anexo" data-id="${anexo.driveFileId}" data-nome="${anexo.nomeArquivo}">🔍</button>
           <button type="button" class="botao-icone" title="Baixar" data-acao="baixar-anexo" data-id="${anexo.driveFileId}" data-nome="${anexo.nomeArquivo}">⬇️</button>
         </div>
       </div>
@@ -419,6 +419,15 @@ async function renderizarLicitacoes(area) {
       <button type="button" class="botao-secundario" id="btn-filtro-sem-anexo">📋 Sem anexo</button>
       <button type="button" class="botao-secundario" id="btn-filtro-com-anexo">📎 Com anexo</button>
       <button type="button" class="botao-secundario" id="btn-selecionar-todos">☑️ Selecionar todos</button>
+      <button type="button" class="botao-secundario" id="btn-alternar-filtros-avancados">🔧 Filtros Avançados</button>
+    </div>
+    <div id="painel-filtros-avancados" class="cartao-manutencao oculto">
+      <div class="linha-formulario">
+        <div><label>Número</label><input type="text" id="fa-numero"></div>
+        <div><label>Modalidade</label><select id="fa-modalidade"><option value="">Todas</option></select></div>
+      </div>
+      <button class="botao-primario" id="btn-aplicar-filtros-avancados">Aplicar Filtros</button>
+      <button class="botao-secundario" id="btn-limpar-filtros-avancados">Limpar</button>
     </div>
     ${htmlBarraSelecaoExportacao()}
     <div id="lista-registros" class="lista-cartoes"></div>
@@ -431,6 +440,34 @@ async function renderizarLicitacoes(area) {
   const modalidades = await carregarOpcoesSelect("modalidadesLicitacao");
   const mapaModalidades = Object.fromEntries(modalidades.map((m) => [m.id, m.nome]));
   const mapaModalidadePorNome = Object.fromEntries(modalidades.map((m) => [normalizarTexto(m.nome), m.id]));
+
+  document.getElementById("fa-modalidade").innerHTML += montarOpcoesHtml(modalidades);
+  document.getElementById("btn-alternar-filtros-avancados").addEventListener("click", () => {
+    document.getElementById("painel-filtros-avancados").classList.toggle("oculto");
+  });
+  document.getElementById("btn-aplicar-filtros-avancados").addEventListener("click", async () => {
+    const numero = normalizarTexto(document.getElementById("fa-numero").value.trim());
+    const modalidadeId = document.getElementById("fa-modalidade").value;
+    const lista = document.getElementById("lista-registros");
+    document.getElementById("btn-carregar-mais").classList.add("oculto");
+    lista.innerHTML = `<p class="texto-secundario">Filtrando...</p>`;
+    try {
+      const snapshot = await colecaoEntidade("licitacoes").limit(5000).get();
+      let registros = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      if (numero) registros = registros.filter((r) => (r.numeroNormalizado || "").includes(numero));
+      if (modalidadeId) registros = registros.filter((r) => r.modalidadeId === modalidadeId);
+      lista.innerHTML = "";
+      registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
+      if (registros.length === 0) lista.innerHTML = `<p class="texto-secundario">Nenhum resultado encontrado com esses filtros.</p>`;
+    } catch (erro) {
+      tratarErroConsultaFirestore(erro);
+    }
+  });
+  document.getElementById("btn-limpar-filtros-avancados").addEventListener("click", () => {
+    document.getElementById("fa-numero").value = "";
+    document.getElementById("fa-modalidade").value = "";
+    carregarPagina(true);
+  });
 
   if (usuarioPodeEditar()) {
     const colunasLicitacoes = [
@@ -524,14 +561,13 @@ async function renderizarLicitacoes(area) {
       evento.stopPropagation();
       abrirModalDespesasVinculadas(registro, evento.currentTarget);
     });
-    cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", () => abrirFormulario(registro));
-    cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) =>
-      excluirLicitacao(registro, evento.target)
-    );
-    if (!usuarioPodeEditar()) {
-      cartao.classList.add("cartao-clicavel");
-      cartao.addEventListener("click", () => abrirFormulario(registro));
-    }
+    cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", (evento) => { evento.stopPropagation(); abrirFormulario(registro); });
+    cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) => {
+      evento.stopPropagation();
+      excluirLicitacao(registro, evento.target);
+    });
+    cartao.classList.add("cartao-clicavel");
+    cartao.addEventListener("click", () => abrirFormulario(registro));
     return cartao;
   }
 
@@ -750,6 +786,15 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
       <button type="button" class="botao-secundario" id="btn-filtro-sem-anexo">📋 Sem anexo</button>
       <button type="button" class="botao-secundario" id="btn-filtro-com-anexo">📎 Com anexo</button>
       <button type="button" class="botao-secundario" id="btn-selecionar-todos">☑️ Selecionar todos</button>
+      <button type="button" class="botao-secundario" id="btn-alternar-filtros-avancados">🔧 Filtros Avançados</button>
+    </div>
+    <div id="painel-filtros-avancados" class="cartao-manutencao oculto">
+      <div class="linha-formulario">
+        <div><label>Número</label><input type="text" id="fa-numero"></div>
+        <div><label>Tipo</label><select id="fa-tipo"><option value="">Todos</option></select></div>
+      </div>
+      <button class="botao-primario" id="btn-aplicar-filtros-avancados">Aplicar Filtros</button>
+      <button class="botao-secundario" id="btn-limpar-filtros-avancados">Limpar</button>
     </div>
     ${htmlBarraSelecaoExportacao()}
     <div id="lista-registros" class="lista-cartoes"></div>
@@ -762,6 +807,34 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
   const tipos = await carregarOpcoesSelect("tiposDocumento");
   const mapaTipos = Object.fromEntries(tipos.map((t) => [t.id, t.nome]));
   const mapaTipoPorNome = Object.fromEntries(tipos.map((t) => [normalizarTexto(t.nome), t.id]));
+
+  document.getElementById("fa-tipo").innerHTML += montarOpcoesHtml(tipos);
+  document.getElementById("btn-alternar-filtros-avancados").addEventListener("click", () => {
+    document.getElementById("painel-filtros-avancados").classList.toggle("oculto");
+  });
+  document.getElementById("btn-aplicar-filtros-avancados").addEventListener("click", async () => {
+    const numero = normalizarTexto(document.getElementById("fa-numero").value.trim());
+    const tipoId = document.getElementById("fa-tipo").value;
+    const lista = document.getElementById("lista-registros");
+    document.getElementById("btn-carregar-mais").classList.add("oculto");
+    lista.innerHTML = `<p class="texto-secundario">Filtrando...</p>`;
+    try {
+      const snapshot = await colecaoEntidade(nomeColecao).limit(5000).get();
+      let registros = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      if (numero) registros = registros.filter((r) => (r.numeroNormalizado || "").includes(numero));
+      if (tipoId) registros = registros.filter((r) => r.tipoId === tipoId);
+      lista.innerHTML = "";
+      registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
+      if (registros.length === 0) lista.innerHTML = `<p class="texto-secundario">Nenhum resultado encontrado com esses filtros.</p>`;
+    } catch (erro) {
+      tratarErroConsultaFirestore(erro);
+    }
+  });
+  document.getElementById("btn-limpar-filtros-avancados").addEventListener("click", () => {
+    document.getElementById("fa-numero").value = "";
+    document.getElementById("fa-tipo").value = "";
+    carregarPagina(true);
+  });
 
   if (usuarioPodeEditar()) {
     const colunasModulo = [
@@ -846,14 +919,13 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
     cartao.querySelector(".checkbox-selecao-registro").addEventListener("change", (evento) =>
       gerenciadorSelecao.alternarSelecao(registro, evento.target.checked)
     );
-    cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", () => abrirFormulario(registro));
-    cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) =>
-      excluirRegistroModulo(registro, evento.target)
-    );
-    if (!usuarioPodeEditar()) {
-      cartao.classList.add("cartao-clicavel");
-      cartao.addEventListener("click", () => abrirFormulario(registro));
-    }
+    cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", (evento) => { evento.stopPropagation(); abrirFormulario(registro); });
+    cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) => {
+      evento.stopPropagation();
+      excluirRegistroModulo(registro, evento.target);
+    });
+    cartao.classList.add("cartao-clicavel");
+    cartao.addEventListener("click", () => abrirFormulario(registro));
     return cartao;
   }
 
@@ -1026,6 +1098,31 @@ async function renderizarDespesas(area) {
       <button type="button" class="botao-secundario" id="btn-filtro-sem-anexo">📋 Sem anexo</button>
       <button type="button" class="botao-secundario" id="btn-filtro-com-anexo">📎 Com anexo</button>
       <button type="button" class="botao-secundario" id="btn-selecionar-todos">☑️ Selecionar todos</button>
+      <button type="button" class="botao-secundario" id="btn-alternar-filtros-avancados">🔧 Filtros Avançados</button>
+    </div>
+    <div id="painel-filtros-avancados" class="cartao-manutencao oculto">
+      <div class="linha-formulario">
+        <div><label>Número do Empenho</label><input type="text" id="fa-numero-empenho"></div>
+        <div><label>Ordem de Pagamento</label><input type="text" id="fa-ordem-pagamento"></div>
+      </div>
+      <div class="linha-formulario">
+        <div><label>Credor</label><select id="fa-credor"><option value="">Todos</option></select></div>
+        <div><label>Unidade Orçamentária</label><select id="fa-unidade"><option value="">Todas</option></select></div>
+      </div>
+      <div class="linha-formulario">
+        <div><label>Fonte de Recurso</label><select id="fa-fonte"><option value="">Todas</option></select></div>
+        <div><label>Elemento de Despesa</label><input type="text" id="fa-elemento" placeholder="Ex: 3.3.90.30.00"></div>
+      </div>
+      <div class="linha-formulario">
+        <div><label>Valor mínimo (R$)</label><input type="number" step="0.01" id="fa-valor-min"></div>
+        <div><label>Valor máximo (R$)</label><input type="number" step="0.01" id="fa-valor-max"></div>
+      </div>
+      <div class="linha-formulario">
+        <div><label>Data de pagamento — de</label><input type="date" id="fa-data-de"></div>
+        <div><label>Data de pagamento — até</label><input type="date" id="fa-data-ate"></div>
+      </div>
+      <button class="botao-primario" id="btn-aplicar-filtros-avancados">Aplicar Filtros</button>
+      <button class="botao-secundario" id="btn-limpar-filtros-avancados">Limpar</button>
     </div>
     ${htmlBarraSelecaoExportacao()}
     <div id="lista-registros" class="lista-cartoes"></div>
@@ -1039,6 +1136,64 @@ async function renderizarDespesas(area) {
     carregarOpcoesSelect("unidadesOrcamentarias"),
     carregarOpcoesSelect("fontesRecurso"),
   ]);
+
+  // -------- Filtros Avançados (item 9): um campo por dado do formulário --------
+  document.getElementById("btn-alternar-filtros-avancados").addEventListener("click", () => {
+    document.getElementById("painel-filtros-avancados").classList.toggle("oculto");
+  });
+  document.getElementById("fa-unidade").innerHTML += montarOpcoesHtml(unidadesOrc);
+  document.getElementById("fa-fonte").innerHTML += montarOpcoesHtml(fontesRecurso);
+  carregarOpcoesSelect("credores").then((credores) => {
+    document.getElementById("fa-credor").innerHTML += montarOpcoesHtml(credores);
+  });
+
+  async function aplicarFiltrosAvancados() {
+    const filtros = {
+      numeroEmpenho: normalizarTexto(document.getElementById("fa-numero-empenho").value.trim()),
+      ordemPagamento: normalizarTexto(document.getElementById("fa-ordem-pagamento").value.trim()),
+      credorId: document.getElementById("fa-credor").value,
+      unidadeOrcamentariaId: document.getElementById("fa-unidade").value,
+      fonteRecursoId: document.getElementById("fa-fonte").value,
+      elemento: document.getElementById("fa-elemento").value.trim(),
+      valorMin: parseFloat(document.getElementById("fa-valor-min").value) || null,
+      valorMax: parseFloat(document.getElementById("fa-valor-max").value) || null,
+      dataDe: document.getElementById("fa-data-de").value || null,
+      dataAte: document.getElementById("fa-data-ate").value || null,
+    };
+
+    const lista = document.getElementById("lista-registros");
+    document.getElementById("btn-carregar-mais").classList.add("oculto");
+    lista.innerHTML = `<p class="texto-secundario">Filtrando...</p>`;
+
+    try {
+      const snapshot = await colecaoEntidade("processosDespesa").limit(5000).get();
+      let registros = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
+      if (filtros.numeroEmpenho) registros = registros.filter((r) => (r.numeroEmpenhoNormalizado || "").includes(filtros.numeroEmpenho));
+      if (filtros.ordemPagamento) registros = registros.filter((r) => (r.ordemPagamentoNormalizado || "").includes(filtros.ordemPagamento));
+      if (filtros.credorId) registros = registros.filter((r) => r.credorId === filtros.credorId);
+      if (filtros.unidadeOrcamentariaId) registros = registros.filter((r) => r.unidadeOrcamentariaId === filtros.unidadeOrcamentariaId);
+      if (filtros.fonteRecursoId) registros = registros.filter((r) => r.fonteRecursoId === filtros.fonteRecursoId);
+      if (filtros.elemento) registros = registros.filter((r) => (r.elementoDespesa || "").includes(filtros.elemento));
+      if (filtros.valorMin !== null) registros = registros.filter((r) => (r.valor || 0) >= filtros.valorMin);
+      if (filtros.valorMax !== null) registros = registros.filter((r) => (r.valor || 0) <= filtros.valorMax);
+      if (filtros.dataDe) registros = registros.filter((r) => r.dataPagamento && r.dataPagamento >= filtros.dataDe);
+      if (filtros.dataAte) registros = registros.filter((r) => r.dataPagamento && r.dataPagamento <= filtros.dataAte);
+
+      lista.innerHTML = "";
+      registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
+      if (registros.length === 0) lista.innerHTML = `<p class="texto-secundario">Nenhum resultado encontrado com esses filtros.</p>`;
+    } catch (erro) {
+      tratarErroConsultaFirestore(erro);
+    }
+  }
+
+  document.getElementById("btn-aplicar-filtros-avancados").addEventListener("click", aplicarFiltrosAvancados);
+  document.getElementById("btn-limpar-filtros-avancados").addEventListener("click", () => {
+    ["fa-numero-empenho", "fa-ordem-pagamento", "fa-elemento", "fa-valor-min", "fa-valor-max", "fa-data-de", "fa-data-ate"].forEach((id) => (document.getElementById(id).value = ""));
+    ["fa-credor", "fa-unidade", "fa-fonte"].forEach((id) => (document.getElementById(id).value = ""));
+    carregarPagina(true);
+  });
 
   // Credores e licitações completos só são baixados quando o usuário
   // realmente clica em Importar ou Exportar — não no carregamento da
@@ -1227,14 +1382,13 @@ async function renderizarDespesas(area) {
       evento.stopPropagation();
       abrirModalResumoLicitacaoVinculada(registro.licitacaoId, evento.currentTarget);
     });
-    cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", () => abrirFormulario(registro));
-    cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) =>
-      excluirDespesa(registro, evento.target)
-    );
-    if (!usuarioPodeEditar()) {
-      cartao.classList.add("cartao-clicavel");
-      cartao.addEventListener("click", () => abrirFormulario(registro));
-    }
+    cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", (evento) => { evento.stopPropagation(); abrirFormulario(registro); });
+    cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) => {
+      evento.stopPropagation();
+      excluirDespesa(registro, evento.target);
+    });
+    cartao.classList.add("cartao-clicavel");
+    cartao.addEventListener("click", () => abrirFormulario(registro));
     return cartao;
   }
 
@@ -1245,11 +1399,11 @@ async function renderizarDespesas(area) {
 
       <div class="linha-formulario">
         <div>
-          <label>Ordem de Pagamento *</label>
+          <label>Ordem de Pagamento</label>
           <input type="text" id="campo-ordem-pagamento" value="${registro?.ordemPagamento || ""}">
         </div>
         <div>
-          <label>Elemento de Despesa *</label>
+          <label>Elemento de Despesa</label>
           <input type="text" id="campo-elemento-despesa" placeholder="Ex: 3.3.90.30.00" value="${registro?.elementoDespesa || ""}">
         </div>
       </div>
@@ -1306,11 +1460,11 @@ async function renderizarDespesas(area) {
 
       <div class="linha-formulario">
         <div>
-          <label>Data do Pagamento *</label>
+          <label>Data do Pagamento</label>
           <input type="date" id="campo-data-pagamento" value="${registro?.dataPagamento || ""}">
         </div>
         <div>
-          <label>Valor (R$) *</label>
+          <label>Valor (R$)</label>
           <input type="number" step="0.01" id="campo-valor" value="${registro?.valor || ""}">
         </div>
       </div>
@@ -1335,12 +1489,12 @@ async function renderizarDespesas(area) {
 
       let valido = true;
       if (!campoNumeroEmpenho.value.trim()) { marcarCampoInvalido(campoNumeroEmpenho, "Informe o número do empenho."); valido = false; }
-      if (!campoOrdemPagamento.value.trim()) { marcarCampoInvalido(campoOrdemPagamento, "Informe a ordem de pagamento."); valido = false; }
+      // Ordem de Pagamento e Elemento de Despesa ficaram opcionais —
+      // muitos registros migrados de sistemas antigos não tinham esses
+      // dados, e não faz sentido travar o cadastro por causa disso. Se
+      // preenchido, o Elemento de Despesa ainda precisa estar no formato certo.
       const padraoElementoDespesa = /^\d\.\d\.\d{2}\.\d{2}\.\d{2}$/;
-      if (!campoElementoDespesa.value.trim()) {
-        marcarCampoInvalido(campoElementoDespesa, "Informe o elemento de despesa.");
-        valido = false;
-      } else if (!padraoElementoDespesa.test(campoElementoDespesa.value.trim())) {
+      if (campoElementoDespesa.value.trim() && !padraoElementoDespesa.test(campoElementoDespesa.value.trim())) {
         marcarCampoInvalido(campoElementoDespesa, "Formato esperado: 9.9.99.99.99 (ex: 3.3.90.30.00).");
         valido = false;
       }
@@ -1352,8 +1506,7 @@ async function renderizarDespesas(area) {
       if (!campoUnidadeOrc.value) { marcarCampoInvalido(campoUnidadeOrc, "Selecione a unidade orçamentária."); valido = false; }
       if (!campoFonteRecurso.value) { marcarCampoInvalido(campoFonteRecurso, "Selecione a fonte de recurso."); valido = false; }
       if (!campoObjeto.value.trim()) { marcarCampoInvalido(campoObjeto, "Informe o objeto."); valido = false; }
-      if (!campoDataPagamento.value) { marcarCampoInvalido(campoDataPagamento, "Informe a data de pagamento."); valido = false; }
-      if (!campoValor.value) { marcarCampoInvalido(campoValor, "Informe o valor."); valido = false; }
+      // Data de Pagamento e Valor também ficaram opcionais, pelo mesmo motivo.
       if (!valido) return;
 
       await executarComFeedback(botaoSalvar, async () => {
@@ -1375,11 +1528,11 @@ async function renderizarDespesas(area) {
           folhaNome: document.getElementById("campo-folha-busca").value.trim() || null,
           objeto: campoObjeto.value.trim(),
           objetoNormalizado: normalizarTexto(campoObjeto.value),
-          dataPagamento: campoDataPagamento.value,
+          dataPagamento: campoDataPagamento.value || null,
           // competênciaKey guarda o "AAAA-MM" fixo, útil para filtrar por período
           // sem depender de conversão de fuso na data de pagamento em si.
-          competenciaKey: campoDataPagamento.value.slice(0, 7),
-          valor: parseFloat(campoValor.value),
+          competenciaKey: campoDataPagamento.value ? campoDataPagamento.value.slice(0, 7) : null,
+          valor: campoValor.value ? parseFloat(campoValor.value) : 0,
           anexos: controleAnexos.obterAnexos(),
           quantidadeAnexos: controleAnexos.obterAnexos().length,
         };

@@ -10,7 +10,7 @@
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/estilos.css?v=53">
+  <link rel="stylesheet" href="css/estilos.css?v=61">
 </head>
 <body>
 
@@ -18,12 +18,18 @@
   <div id="tela-login" class="tela-login">
     <div class="caixa-login">
       <img src="logo-horizontal.png" alt="SOFT+" class="logo-login">
-      <p class="texto-secundario">Indexação de Documentos — entre com seu e-mail e senha cadastrados.</p>
+      <h1 class="titulo-login">Indexação de Documentos</h1>
+      <p class="texto-secundario descricao-login">
+        Organize e encontre em segundos os documentos de Licitações,
+        Despesas, Legislação e Recursos Humanos da sua unidade gestora —
+        tudo digitalizado, com anexos em PDF vinculados a cada registro.
+      </p>
       <label>E-mail</label>
       <input type="email" id="login-email" autocomplete="username">
       <label>Senha</label>
       <input type="password" id="login-senha" autocomplete="current-password">
       <button class="botao-primario botao-largura-total" id="btn-entrar">Entrar</button>
+      <button type="button" class="botao-link" id="btn-esqueci-senha">Esqueci minha senha</button>
       <div id="erro-login" class="mensagem-erro oculto"></div>
       <p class="versao-app" id="versao-app-login"></p>
     </div>
@@ -42,7 +48,7 @@
   <div id="app-container" class="app-container oculto">
     <header class="cabecalho-app">
       <button id="btn-abrir-menu" class="botao-icone-menu">☰</button>
-      <span class="titulo-app"><img src="logo-simbolo.png" alt="SOFT+" class="simbolo-cabecalho"> Indexação de Documentos</span>
+      <span class="titulo-app"><img src="logo-simbolo.png" alt="SOFT+" class="simbolo-cabecalho"> <span class="titulo-app-texto">Indexação de Documentos</span></span>
       <select id="seletor-entidade" class="seletor-entidade"></select>
       <span class="nome-usuario" id="nome-usuario-logado"></span>
       <button id="btn-instalar-app" class="botao-instalar oculto">⬇️ Instalar app</button>
@@ -80,19 +86,19 @@
   <!-- JSZip — usado para exportar vários PDFs de uma vez, compactados -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
-  <script src="js/firebase-config.js?v=53"></script>
-  <script src="js/core.js?v=53"></script>
-  <script src="js/drive.js?v=53"></script>
-  <script src="js/anexos.js?v=53"></script>
-  <script src="js/importacao-exportacao.js?v=53"></script>
-  <script src="js/cadastros-simples.js?v=53"></script>
-  <script src="js/processos.js?v=53"></script>
-  <script src="js/pessoal.js?v=53"></script>
-  <script src="js/migracao-appsheet.js?v=53"></script>
-  <script src="js/relatorios.js?v=53"></script>
-  <script src="js/relatorios-detalhados.js?v=53"></script>
-  <script src="js/manutencao.js?v=53"></script>
-  <script src="js/usuarios.js?v=53"></script>
+  <script src="js/firebase-config.js?v=61"></script>
+  <script src="js/core.js?v=61"></script>
+  <script src="js/drive.js?v=61"></script>
+  <script src="js/anexos.js?v=61"></script>
+  <script src="js/importacao-exportacao.js?v=61"></script>
+  <script src="js/cadastros-simples.js?v=61"></script>
+  <script src="js/processos.js?v=61"></script>
+  <script src="js/pessoal.js?v=61"></script>
+  <script src="js/migracao-appsheet.js?v=61"></script>
+  <script src="js/relatorios.js?v=61"></script>
+  <script src="js/relatorios-detalhados.js?v=61"></script>
+  <script src="js/manutencao.js?v=61"></script>
+  <script src="js/usuarios.js?v=61"></script>
 
   <script>
     // -------- Login --------
@@ -123,6 +129,27 @@
         }
       }, "Entrando...");
     }
+
+    document.getElementById("btn-esqueci-senha").addEventListener("click", async () => {
+      const avisoErro = document.getElementById("erro-login");
+      avisoErro.classList.add("oculto");
+      const email = document.getElementById("login-email").value.trim();
+      if (!email) {
+        avisoErro.textContent = "Digite seu e-mail no campo acima primeiro, depois clique em \"Esqueci minha senha\".";
+        avisoErro.classList.remove("oculto");
+        return;
+      }
+      const botao = document.getElementById("btn-esqueci-senha");
+      await executarComFeedback(botao, async () => {
+        try {
+          await auth.sendPasswordResetEmail(email);
+          mostrarToast(`Enviamos um link de redefinição de senha pra ${email}. Confira sua caixa de entrada (e o spam).`, "sucesso");
+        } catch (erro) {
+          avisoErro.textContent = "Não foi possível enviar o e-mail de redefinição — confira se o e-mail está certo.";
+          avisoErro.classList.remove("oculto");
+        }
+      }, "Enviando...");
+    });
 
     document.getElementById("btn-sair").addEventListener("click", fazerLogout);
 

@@ -17,6 +17,14 @@ async function renderizarManutencao(area) {
       atualização do sistema, sem precisar abrir um por um.
     </p>
 
+    <div class="abas-manutencao">
+      <button type="button" class="aba-manutencao-botao aba-manutencao-ativa" data-aba="migracao">Migração AppSheet</button>
+      <button type="button" class="aba-manutencao-botao" data-aba="reindexacao">Reindexação</button>
+      <button type="button" class="aba-manutencao-botao" data-aba="drive">Drive</button>
+      <button type="button" class="aba-manutencao-botao" data-aba="massa">Atualização em Massa</button>
+    </div>
+
+    <div class="conteudo-aba-manutencao" data-aba-conteudo="migracao">
     <div class="cartao-manutencao">
       <h3>🔧 Corrigir Anexos Migrados do AppSheet</h3>
       <p class="texto-secundario">
@@ -88,7 +96,9 @@ async function renderizarManutencao(area) {
       <button class="botao-primario" id="btn-rodar-migracao">Iniciar Migração</button>
       <div id="resultado-migracao" class="resultado-manutencao"></div>
     </div>
+    </div>
 
+    <div class="conteudo-aba-manutencao oculto" data-aba-conteudo="reindexacao">
     <div class="cartao-manutencao">
       <h3>Reindexar campos de busca — Processos de Despesa</h3>
       <p class="texto-secundario">
@@ -128,7 +138,9 @@ async function renderizarManutencao(area) {
       <button class="botao-primario" id="btn-reindexar-documentos" style="margin-top:10px">Reindexar Documentos Diversos</button>
       <div id="resultado-documentos" class="resultado-manutencao"></div>
     </div>
+    </div>
 
+    <div class="conteudo-aba-manutencao oculto" data-aba-conteudo="drive">
     <div class="cartao-manutencao">
       <h3>🔄 Migrar Anexos pro Drive Próprio desta Unidade Gestora</h3>
       <p class="texto-secundario">
@@ -147,7 +159,9 @@ async function renderizarManutencao(area) {
       <button class="botao-primario" id="btn-migrar-drive">Migrar Anexos</button>
       <div id="resultado-migracao-drive" class="resultado-manutencao"></div>
     </div>
+    </div>
 
+    <div class="conteudo-aba-manutencao oculto" data-aba-conteudo="massa">
     <div class="cartao-manutencao">
       <h3>⚙️ Atualização em Massa</h3>
       <p class="texto-secundario">
@@ -202,7 +216,19 @@ async function renderizarManutencao(area) {
       <button type="button" class="botao-primario" id="btn-aplicar-massa" disabled style="margin-top:16px">✅ Aplicar atualização</button>
       <div id="resultado-massa" class="resultado-manutencao"></div>
     </div>
+    </div>
   `;
+
+  document.querySelectorAll(".aba-manutencao-botao").forEach((botao) => {
+    botao.addEventListener("click", () => {
+      document.querySelectorAll(".aba-manutencao-botao").forEach((b) => b.classList.remove("aba-manutencao-ativa"));
+      botao.classList.add("aba-manutencao-ativa");
+      const abaAlvo = botao.dataset.aba;
+      document.querySelectorAll(".conteudo-aba-manutencao").forEach((conteudo) => {
+        conteudo.classList.toggle("oculto", conteudo.dataset.abaConteudo !== abaAlvo);
+      });
+    });
+  });
 
   configurarAtualizacaoEmMassa();
 

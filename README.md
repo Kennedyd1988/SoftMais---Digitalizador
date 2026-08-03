@@ -210,6 +210,12 @@ está tudo certo.
 
 ## Changelog
 
+**v8.14** — Cabeçalhos de grupo do menu lateral (Cadastros, Licitações
+e Demais Processos, Recursos Humanos, Relatórios, Administração)
+ganharam mais destaque: fonte maior e mais forte, cor azul da marca,
+fundo levemente diferente e uma borda de destaque à esquerda ao passar
+o mouse.
+
 **v8.13** — A correção da v8.12 não bastou: havia um **segundo ponto**
 com o mesmo tipo de erro, esse dentro do laço que desenha cada anexo —
 o botão "Remover" (🗑️) também só existe pra quem edita, e o código

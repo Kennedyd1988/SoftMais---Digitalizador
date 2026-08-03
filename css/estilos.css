@@ -222,23 +222,24 @@ input:focus, select:focus, textarea:focus {
 .grupo-menu {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   width: 100%;
-  background: none;
+  background: var(--ink);
   border: none;
+  border-left: 3px solid transparent;
   cursor: pointer;
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 12.5px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--cinza-texto, #5c7692);
-  padding: 16px 16px 6px;
-  margin-top: 4px;
+  letter-spacing: 0.07em;
+  color: var(--azul-principal);
+  padding: 10px 13px;
+  margin-top: 6px;
   text-align: left;
 }
-.grupo-menu:hover { color: var(--azul-principal); }
+.grupo-menu:hover { border-left-color: var(--azul-principal); background: var(--azul-claro); }
 .grupo-menu:first-of-type { margin-top: 0; }
-.seta-grupo-menu { font-size: 9px; transition: transform 0.15s; }
+.seta-grupo-menu { font-size: 10px; transition: transform 0.15s; }
 .itens-grupo-menu { display: flex; flex-direction: column; }
 
 .item-menu {

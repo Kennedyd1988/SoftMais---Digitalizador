@@ -210,6 +210,24 @@ está tudo certo.
 
 ## Changelog
 
+**v8.15 (retomado a partir desta base v8.14)** — ⚠️ A partir daqui, o
+desenvolvimento voltou a usar **esta versão específica** como base
+oficial — as versões "v8.15/8.16/8.17" de uma leva anterior (migração
+de armazenamento pro Storage + primeira tentativa da árvore) foram
+**descartadas** por não terem sido testadas, a pedido do cliente. Se
+você tiver algum arquivo daquela leva, não use — pode causar
+inconsistência com o que está documentado aqui em diante.
+
+Nova opção de navegação em árvore (Ano → categoria), parecido com o
+sistema antigo (AppSheet), sem as cores: botão "🌳 Navegar por
+Ano/Modalidade" em **Licitações** (Ano → Modalidade) e "🌳 Navegar por
+Ano/Unidade" em **Processos de Despesa** (Ano → Unidade Orçamentária).
+É uma opção **a mais**, ao lado da busca e dos Filtros Avançados que já
+existiam — não troca nada, só soma. Clicar no nome do ano filtra por
+todo aquele ano; clicar na seta expande/recolhe pra ver as categorias
+por dentro; clicar numa categoria filtra por ano+categoria junto;
+"Todos" reseta o filtro.
+
 **v8.14** — Cabeçalhos de grupo do menu lateral (Cadastros, Licitações
 e Demais Processos, Recursos Humanos, Relatórios, Administração)
 ganharam mais destaque: fonte maior e mais forte, cor azul da marca,

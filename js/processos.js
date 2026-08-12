@@ -420,6 +420,7 @@ async function renderizarLicitacoes(area) {
       <button type="button" class="botao-secundario" id="btn-filtro-com-anexo">📎 Com anexo</button>
       <button type="button" class="botao-secundario" id="btn-selecionar-todos">☑️ Selecionar todos</button>
       <button type="button" class="botao-secundario" id="btn-alternar-filtros-avancados">🔧 Filtros Avançados</button>
+      <button type="button" class="botao-secundario" id="btn-alternar-arvore">🌳 Navegar por Ano/Modalidade</button>
     </div>
     <div id="painel-filtros-avancados" class="cartao-manutencao oculto">
       <div class="linha-formulario">
@@ -430,8 +431,13 @@ async function renderizarLicitacoes(area) {
       <button class="botao-secundario" id="btn-limpar-filtros-avancados">Limpar</button>
     </div>
     ${htmlBarraSelecaoExportacao()}
-    <div id="lista-registros" class="lista-cartoes"></div>
-    <button id="btn-carregar-mais" class="botao-secundario oculto">Carregar mais</button>
+    <div class="layout-com-arvore">
+      <div id="arvore-navegacao" class="painel-arvore oculto"></div>
+      <div class="conteudo-com-arvore">
+        <div id="lista-registros" class="lista-cartoes"></div>
+        <button id="btn-carregar-mais" class="botao-secundario oculto">Carregar mais</button>
+      </div>
+    </div>
   `;
 
   let paginador = criarPaginador(colecaoEntidade("licitacoes").orderBy("criadoEm", "desc"));
@@ -445,6 +451,44 @@ async function renderizarLicitacoes(area) {
   document.getElementById("btn-alternar-filtros-avancados").addEventListener("click", () => {
     document.getElementById("painel-filtros-avancados").classList.toggle("oculto");
   });
+
+  // -------- Navegação em árvore (Ano → Modalidade), opcional --------
+  let arvoreJaCarregada = false;
+  document.getElementById("btn-alternar-arvore").addEventListener("click", async () => {
+    const painel = document.getElementById("arvore-navegacao");
+    painel.classList.toggle("oculto");
+    if (painel.classList.contains("oculto") || arvoreJaCarregada) return;
+
+    painel.innerHTML = `<p class="texto-secundario" style="padding:12px">Carregando...</p>`;
+    try {
+      const snapshot = await colecaoEntidade("licitacoes").limit(5000).get();
+      const registrosParaArvore = snapshot.docs.map((doc) => ({
+        ano: doc.data().ano,
+        subdivisao: doc.data().modalidadeNome,
+      }));
+      montarArvoreNavegacao(painel, registrosParaArvore, async (ano, modalidadeNome) => {
+        const lista = document.getElementById("lista-registros");
+        document.getElementById("btn-carregar-mais").classList.add("oculto");
+        if (ano === undefined) { // "Todos" — volta pro carregamento normal
+          paginador = criarPaginador(colecaoEntidade("licitacoes").orderBy("criadoEm", "desc"));
+          carregarPagina(true);
+          return;
+        }
+        lista.innerHTML = `<p class="texto-secundario">Filtrando...</p>`;
+        const snap = await colecaoEntidade("licitacoes").limit(5000).get();
+        let registros = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        if (ano !== null) registros = registros.filter((r) => String(r.ano) === String(ano));
+        if (modalidadeNome !== null) registros = registros.filter((r) => r.modalidadeNome === modalidadeNome);
+        lista.innerHTML = "";
+        registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
+        if (registros.length === 0) lista.innerHTML = `<p class="texto-secundario">Nenhum resultado nessa categoria.</p>`;
+      });
+      arvoreJaCarregada = true;
+    } catch (erro) {
+      tratarErroConsultaFirestore(erro);
+    }
+  });
+
   document.getElementById("btn-aplicar-filtros-avancados").addEventListener("click", async () => {
     const numero = normalizarTexto(document.getElementById("fa-numero").value.trim());
     const modalidadeId = document.getElementById("fa-modalidade").value;
@@ -1107,6 +1151,7 @@ async function renderizarDespesas(area) {
       <button type="button" class="botao-secundario" id="btn-filtro-com-anexo">📎 Com anexo</button>
       <button type="button" class="botao-secundario" id="btn-selecionar-todos">☑️ Selecionar todos</button>
       <button type="button" class="botao-secundario" id="btn-alternar-filtros-avancados">🔧 Filtros Avançados</button>
+      <button type="button" class="botao-secundario" id="btn-alternar-arvore">🌳 Navegar por Ano/Unidade</button>
     </div>
     <div id="painel-filtros-avancados" class="cartao-manutencao oculto">
       <div class="linha-formulario">
@@ -1133,8 +1178,13 @@ async function renderizarDespesas(area) {
       <button class="botao-secundario" id="btn-limpar-filtros-avancados">Limpar</button>
     </div>
     ${htmlBarraSelecaoExportacao()}
-    <div id="lista-registros" class="lista-cartoes"></div>
-    <button id="btn-carregar-mais" class="botao-secundario oculto">Carregar mais</button>
+    <div class="layout-com-arvore">
+      <div id="arvore-navegacao" class="painel-arvore oculto"></div>
+      <div class="conteudo-com-arvore">
+        <div id="lista-registros" class="lista-cartoes"></div>
+        <button id="btn-carregar-mais" class="botao-secundario oculto">Carregar mais</button>
+      </div>
+    </div>
   `;
 
   let paginador = criarPaginador(colecaoEntidade("processosDespesa").orderBy("criadoEm", "desc"));
@@ -1151,6 +1201,44 @@ async function renderizarDespesas(area) {
   });
   document.getElementById("fa-unidade").innerHTML += montarOpcoesHtml(unidadesOrc);
   document.getElementById("fa-fonte").innerHTML += montarOpcoesHtml(fontesRecurso);
+
+  // -------- Navegação em árvore (Ano → Unidade Orçamentária), opcional --------
+  let arvoreJaCarregada = false;
+  document.getElementById("btn-alternar-arvore").addEventListener("click", async () => {
+    const painel = document.getElementById("arvore-navegacao");
+    painel.classList.toggle("oculto");
+    if (painel.classList.contains("oculto") || arvoreJaCarregada) return;
+
+    painel.innerHTML = `<p class="texto-secundario" style="padding:12px">Carregando...</p>`;
+    try {
+      const mapaUnidadePorIdParaArvore = Object.fromEntries(unidadesOrc.map((u) => [u.id, u.nome]));
+      const snapshot = await colecaoEntidade("processosDespesa").limit(5000).get();
+      const registrosParaArvore = snapshot.docs.map((doc) => ({
+        ano: doc.data().competenciaKey ? doc.data().competenciaKey.slice(0, 4) : null,
+        subdivisao: mapaUnidadePorIdParaArvore[doc.data().unidadeOrcamentariaId] || null,
+      }));
+      montarArvoreNavegacao(painel, registrosParaArvore, async (ano, unidadeNome) => {
+        const lista = document.getElementById("lista-registros");
+        document.getElementById("btn-carregar-mais").classList.add("oculto");
+        if (ano === undefined) { // "Todos" — volta pro carregamento normal
+          paginador = criarPaginador(colecaoEntidade("processosDespesa").orderBy("criadoEm", "desc"));
+          carregarPagina(true);
+          return;
+        }
+        lista.innerHTML = `<p class="texto-secundario">Filtrando...</p>`;
+        const snap = await colecaoEntidade("processosDespesa").limit(5000).get();
+        let registros = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        if (ano !== null) registros = registros.filter((r) => (r.competenciaKey || "").startsWith(ano));
+        if (unidadeNome !== null) registros = registros.filter((r) => mapaUnidadePorIdParaArvore[r.unidadeOrcamentariaId] === unidadeNome);
+        lista.innerHTML = "";
+        registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
+        if (registros.length === 0) lista.innerHTML = `<p class="texto-secundario">Nenhum resultado nessa categoria.</p>`;
+      });
+      arvoreJaCarregada = true;
+    } catch (erro) {
+      tratarErroConsultaFirestore(erro);
+    }
+  });
   carregarOpcoesSelect("credores").then((credores) => {
     document.getElementById("fa-credor").innerHTML += montarOpcoesHtml(credores);
   });

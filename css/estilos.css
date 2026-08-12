@@ -406,6 +406,64 @@ input:focus, select:focus, textarea:focus {
 .lista-filtro-multi { border: 1px solid var(--cinza-borda); border-radius: 8px; padding: 6px; overflow-y: auto; margin-top: 4px; }
 .contagem-filtro-multi { margin-top: 4px; font-size: 12px; }
 
+/* ---------- ÁRVORE DE NAVEGAÇÃO (Ano → Modalidade/Unidade) ---------- */
+.layout-com-arvore { display: flex; gap: 16px; align-items: flex-start; }
+.conteudo-com-arvore { flex: 1; min-width: 0; }
+.painel-arvore {
+  width: 260px;
+  flex-shrink: 0;
+  border: 1px solid var(--cinza-borda);
+  border-radius: 10px;
+  padding: 10px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.botao-arvore-todos {
+  width: 100%;
+  text-align: left;
+  background: var(--azul-claro);
+  color: var(--azul-principal);
+  border: none;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+.arvore-item-ano {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 7px 6px;
+  font-weight: 700;
+  font-size: 13.5px;
+  cursor: pointer;
+  color: var(--text);
+}
+.arvore-item-ano:hover { color: var(--azul-principal); }
+.arvore-seta { display: inline-block; width: 14px; font-size: 10px; }
+.arvore-subdivisoes { display: flex; flex-direction: column; padding-left: 22px; }
+.arvore-item-subdivisao {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 5px 6px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text);
+  border-radius: 6px;
+}
+.arvore-item-subdivisao:hover { background: var(--azul-claro); color: var(--azul-principal); }
+
+@media (max-width: 760px) {
+  .layout-com-arvore { flex-direction: column; }
+  .painel-arvore { width: 100%; max-height: 260px; }
+}
+
 .abas-manutencao { display: flex; gap: 4px; border-bottom: 1px solid var(--cinza-borda); margin: 16px 0 20px; flex-wrap: wrap; }
 .aba-manutencao-botao {
   background: none; border: none; padding: 10px 16px; cursor: pointer;

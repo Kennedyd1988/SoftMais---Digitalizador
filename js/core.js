@@ -7,7 +7,7 @@
 // e na tela de login, para facilitar conferir se o navegador já está
 // com a versão mais recente (ajuda a identificar problema de cache).
 // ===================================================================
-const VERSAO_APP = "8.14";
+const VERSAO_APP = "8.15";
 document.addEventListener("DOMContentLoaded", () => {
   const elementoLogin = document.getElementById("versao-app-login");
   if (elementoLogin) elementoLogin.textContent = `v${VERSAO_APP}`;
@@ -171,6 +171,76 @@ const TAMANHO_PAGINA = 50;
  * Nunca baixa a coleção inteira — só o lote atual, avançando com
  * startAfter a partir do último documento carregado.
  */
+/**
+ * Monta uma árvore de navegação Ano → Subdivisão (ex: Ano → Modalidade
+ * em Licitações, Ano → Unidade Orçamentária em Despesas) — mesma ideia
+ * do menu em árvore do sistema antigo (AppSheet), sem as cores.
+ * `registros` já precisa vir com os campos de ano/subdivisão prontos:
+ * [{ ano, subdivisao }, ...]. Clicar num nó chama aoSelecionar(ano,
+ * subdivisao) — subdivisao vem null quando clica só no ano.
+ */
+function montarArvoreNavegacao(container, registros, aoSelecionar) {
+  const porAno = new Map();
+  registros.forEach((r) => {
+    const ano = r.ano ?? "Sem ano";
+    if (!porAno.has(ano)) porAno.set(ano, new Map());
+    const porSubdivisao = porAno.get(ano);
+    const subdivisao = r.subdivisao || "(Sem categoria)";
+    porSubdivisao.set(subdivisao, (porSubdivisao.get(subdivisao) || 0) + 1);
+  });
+
+  // Anos em ordem decrescente (mais recente primeiro) — "Sem ano" por último
+  const anosOrdenados = [...porAno.keys()].sort((a, b) => {
+    if (a === "Sem ano") return 1;
+    if (b === "Sem ano") return -1;
+    return b - a;
+  });
+
+  container.innerHTML = `
+    <button type="button" class="botao-arvore-todos" id="arvore-btn-todos">Todos</button>
+    <div id="arvore-lista"></div>
+  `;
+  const listaEl = container.querySelector("#arvore-lista");
+
+  anosOrdenados.forEach((ano) => {
+    const subdivisoes = [...porAno.get(ano).entries()].sort((a, b) => a[0].localeCompare(b[0], "pt-BR"));
+    const totalDoAno = subdivisoes.reduce((soma, [, qtd]) => soma + qtd, 0);
+
+    const linhaAno = document.createElement("button");
+    linhaAno.type = "button";
+    linhaAno.className = "arvore-item-ano";
+    linhaAno.innerHTML = `<span class="arvore-seta">▶</span> ${ano} <span class="texto-secundario">(${totalDoAno})</span>`;
+
+    const containerSubdivisoes = document.createElement("div");
+    containerSubdivisoes.className = "arvore-subdivisoes oculto";
+    subdivisoes.forEach(([nome, qtd]) => {
+      const linhaSub = document.createElement("button");
+      linhaSub.type = "button";
+      linhaSub.className = "arvore-item-subdivisao";
+      linhaSub.innerHTML = `${nome} <span class="texto-secundario">(${qtd})</span>`;
+      linhaSub.addEventListener("click", () => aoSelecionar(ano === "Sem ano" ? null : ano, nome === "(Sem categoria)" ? null : nome));
+      containerSubdivisoes.appendChild(linhaSub);
+    });
+
+    linhaAno.addEventListener("click", (evento) => {
+      // Clicar no texto do ano filtra por aquele ano (todas as
+      // subdivisões); clicar na seta só expande/recolhe.
+      const clicouNaSeta = evento.target.classList.contains("arvore-seta");
+      if (clicouNaSeta) {
+        const recolhido = containerSubdivisoes.classList.toggle("oculto");
+        linhaAno.querySelector(".arvore-seta").textContent = recolhido ? "▶" : "▼";
+      } else {
+        aoSelecionar(ano === "Sem ano" ? null : ano, null);
+      }
+    });
+
+    listaEl.appendChild(linhaAno);
+    listaEl.appendChild(containerSubdivisoes);
+  });
+
+  container.querySelector("#arvore-btn-todos").addEventListener("click", () => aoSelecionar(undefined, undefined));
+}
+
 function criarPaginador(consultaBase) {
   let ultimoDocumento = null;
   let acabou = false;

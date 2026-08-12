@@ -835,6 +835,7 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
       <button type="button" class="botao-secundario" id="btn-filtro-com-anexo">📎 Com anexo</button>
       <button type="button" class="botao-secundario" id="btn-selecionar-todos">☑️ Selecionar todos</button>
       <button type="button" class="botao-secundario" id="btn-alternar-filtros-avancados">🔧 Filtros Avançados</button>
+      <button type="button" class="botao-secundario" id="btn-alternar-arvore">🌳 Navegar por Ano/Tipo</button>
     </div>
     <div id="painel-filtros-avancados" class="cartao-manutencao oculto">
       <div class="linha-formulario">
@@ -845,8 +846,13 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
       <button class="botao-secundario" id="btn-limpar-filtros-avancados">Limpar</button>
     </div>
     ${htmlBarraSelecaoExportacao()}
-    <div id="lista-registros" class="lista-cartoes"></div>
-    <button id="btn-carregar-mais" class="botao-secundario oculto">Carregar mais</button>
+    <div class="layout-com-arvore">
+      <div id="arvore-navegacao" class="painel-arvore oculto"></div>
+      <div class="conteudo-com-arvore">
+        <div id="lista-registros" class="lista-cartoes"></div>
+        <button id="btn-carregar-mais" class="botao-secundario oculto">Carregar mais</button>
+      </div>
+    </div>
   `;
 
   let paginador = criarPaginador(colecaoEntidade(nomeColecao).orderBy("criadoEm", "desc"));
@@ -859,6 +865,43 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
   document.getElementById("fa-tipo").innerHTML += montarOpcoesHtml(tipos);
   document.getElementById("btn-alternar-filtros-avancados").addEventListener("click", () => {
     document.getElementById("painel-filtros-avancados").classList.toggle("oculto");
+  });
+
+  // -------- Navegação em árvore (Ano → Tipo de Documento), opcional --------
+  let arvoreJaCarregada = false;
+  document.getElementById("btn-alternar-arvore").addEventListener("click", async () => {
+    const painel = document.getElementById("arvore-navegacao");
+    painel.classList.toggle("oculto");
+    if (painel.classList.contains("oculto") || arvoreJaCarregada) return;
+
+    painel.innerHTML = `<p class="texto-secundario" style="padding:12px">Carregando...</p>`;
+    try {
+      const snapshot = await colecaoEntidade(nomeColecao).limit(5000).get();
+      const registrosParaArvore = snapshot.docs.map((doc) => ({
+        ano: doc.data().ano,
+        subdivisao: mapaTipos[doc.data().tipoId] || null,
+      }));
+      montarArvoreNavegacao(painel, registrosParaArvore, async (ano, tipoNome) => {
+        const lista = document.getElementById("lista-registros");
+        document.getElementById("btn-carregar-mais").classList.add("oculto");
+        if (ano === undefined) { // "Todos" — volta pro carregamento normal
+          paginador = criarPaginador(colecaoEntidade(nomeColecao).orderBy("criadoEm", "desc"));
+          carregarPagina(true);
+          return;
+        }
+        lista.innerHTML = `<p class="texto-secundario">Filtrando...</p>`;
+        const snap = await colecaoEntidade(nomeColecao).limit(5000).get();
+        let registros = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        if (ano !== null) registros = registros.filter((r) => String(r.ano) === String(ano));
+        if (tipoNome !== null) registros = registros.filter((r) => mapaTipos[r.tipoId] === tipoNome);
+        lista.innerHTML = "";
+        registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
+        if (registros.length === 0) lista.innerHTML = `<p class="texto-secundario">Nenhum resultado nessa categoria.</p>`;
+      });
+      arvoreJaCarregada = true;
+    } catch (erro) {
+      tratarErroConsultaFirestore(erro);
+    }
   });
   document.getElementById("btn-aplicar-filtros-avancados").addEventListener("click", async () => {
     const numero = normalizarTexto(document.getElementById("fa-numero").value.trim());

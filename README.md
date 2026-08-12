@@ -210,6 +210,11 @@ está tudo certo.
 
 ## Changelog
 
+**v8.16** — A mesma árvore de navegação (Ano → categoria) agora também
+em **Legislação** e **Documentos Diversos** — botão "🌳 Navegar por
+Ano/Tipo" (Ano → Tipo de Documento). Como os dois módulos compartilham
+a mesma tela por dentro, uma mudança só cobriu os dois de uma vez.
+
 **v8.15 (retomado a partir desta base v8.14)** — ⚠️ A partir daqui, o
 desenvolvimento voltou a usar **esta versão específica** como base
 oficial — as versões "v8.15/8.16/8.17" de uma leva anterior (migração

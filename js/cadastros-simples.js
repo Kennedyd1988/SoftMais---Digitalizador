@@ -316,21 +316,45 @@ async function renderizarCredores(area) {
     return linha;
   }
 
+  // Máscara de CPF/CNPJ. Só formata na digitação; o valor salvo segue o que
+  // o usuário vê, como já era antes (cadastros antigos sem máscara continuam
+  // abrindo normalmente e não são bloqueados).
+  function mascararDocumento(valor, tipo) {
+    const d = String(valor).replace(/\D/g, "").slice(0, tipo === "PJ" ? 14 : 11);
+    if (tipo === "PJ") {
+      return d.replace(/^(\d{2})(\d)/, "$1.$2").replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+        .replace(/\.(\d{3})(\d)/, ".$1/$2").replace(/(\d{4})(\d)/, "$1-$2");
+    }
+    return d.replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+  }
+
   function abrirFormulario(registro = null) {
     const modal = criarModal(`${registro ? "Editar" : "Novo"} Credor/Fornecedor`, `
-      <label>Tipo *</label>
-      <select id="campo-tipo">
-        <option value="PF" ${registro?.tipo === "PF" ? "selected" : ""}>Pessoa Física</option>
-        <option value="PJ" ${registro?.tipo === "PJ" ? "selected" : ""}>Pessoa Jurídica</option>
-      </select>
-      <label>Nome / Razão Social *</label>
-      <input type="text" id="campo-nome" value="${(registro?.nome || "").replace(/"/g, "&quot;")}">
-      <label id="rotulo-documento">CPF/CNPJ *</label>
-      <input type="text" id="campo-documento" value="${registro?.documento || ""}">
-      <label>Telefone</label>
-      <input type="text" id="campo-telefone" value="${registro?.telefone || ""}">
-      <label>E-mail</label>
-      <input type="text" id="campo-email" value="${registro?.email || ""}">
+      <div class="grade-form">
+        <div class="campo-form">
+          <label for="campo-tipo">Tipo *</label>
+          <select id="campo-tipo">
+            <option value="PF" ${registro?.tipo === "PF" ? "selected" : ""}>Pessoa Física</option>
+            <option value="PJ" ${registro?.tipo === "PJ" ? "selected" : ""}>Pessoa Jurídica</option>
+          </select>
+        </div>
+        <div class="campo-form">
+          <label for="campo-documento" id="rotulo-documento">CPF *</label>
+          <input type="text" id="campo-documento" inputmode="numeric" value="${escaparHtml(registro?.documento || "")}">
+        </div>
+        <div class="campo-form span-2">
+          <label for="campo-nome" id="rotulo-nome">Nome *</label>
+          <input type="text" id="campo-nome" value="${escaparHtml(registro?.nome || "")}">
+        </div>
+        <div class="campo-form">
+          <label for="campo-telefone">Telefone</label>
+          <input type="text" id="campo-telefone" inputmode="tel" placeholder="(00) 00000-0000" value="${escaparHtml(registro?.telefone || "")}">
+        </div>
+        <div class="campo-form">
+          <label for="campo-email">E-mail</label>
+          <input type="text" id="campo-email" inputmode="email" placeholder="contato@exemplo.com.br" value="${escaparHtml(registro?.email || "")}">
+        </div>
+      </div>
     `, async (botaoSalvar) => {
       const campoNome = document.getElementById("campo-nome");
       const campoDocumento = document.getElementById("campo-documento");
@@ -376,6 +400,23 @@ async function renderizarCredores(area) {
         carregarPagina(true);
       });
     });
+
+    // Rótulo e máscara acompanham o tipo escolhido (CPF para pessoa física,
+    // CNPJ e razão social para jurídica).
+    const campoTipo = document.getElementById("campo-tipo");
+    const campoDocumento = document.getElementById("campo-documento");
+    const ajustarPorTipo = (reformatar) => {
+      const pj = campoTipo.value === "PJ";
+      document.getElementById("rotulo-documento").textContent = pj ? "CNPJ *" : "CPF *";
+      document.getElementById("rotulo-nome").textContent = pj ? "Razão social *" : "Nome *";
+      campoDocumento.placeholder = pj ? "00.000.000/0000-00" : "000.000.000-00";
+      if (reformatar) campoDocumento.value = mascararDocumento(campoDocumento.value, campoTipo.value);
+    };
+    campoTipo.addEventListener("change", () => ajustarPorTipo(true));
+    campoDocumento.addEventListener("input", () => {
+      campoDocumento.value = mascararDocumento(campoDocumento.value, campoTipo.value);
+    });
+    ajustarPorTipo(false); // na edição não mexe no documento já salvo
   }
 
   async function excluirCredor(registro) {
@@ -462,7 +503,7 @@ function criarModal(titulo, corpoHtml, aoSalvar, aoExcluir = null) {
       </div>
       <div class="corpo-modal">${corpoHtml}</div>
       <div class="rodape-modal">
-        ${aoExcluir && podeEditar ? `<button class="botao-perigo" id="btn-excluir-modal">🗑️ Excluir</button>` : ""}
+        ${aoExcluir && podeEditar ? `<button class="botao-perigo" id="btn-excluir-modal">Excluir</button>` : ""}
         <div class="rodape-modal-direita">
           <button class="botao-secundario" id="btn-cancelar-modal">${podeEditar ? "Cancelar" : "Fechar"}</button>
           ${podeEditar ? `<button class="botao-primario" id="btn-salvar-modal">Salvar</button>` : ""}

@@ -621,6 +621,44 @@ input:focus, select:focus, textarea:focus { border-color: var(--acento); box-sha
 .botao-arvore-todos { border-radius: 8px; }
 .arvore-item-subdivisao:hover, .arvore-item-ano:hover { background: var(--ink); }
 
+/* ---- Login e escolha da unidade: mesmo desenho do Portal (metade azul lisa, metade branca) ---- */
+.tela-login { background: var(--ink); }
+.painel-login-azul { background: var(--brand); gap: 18px; }
+.titulo-painel-azul { font-size: 34px; max-width: 460px; }
+.descricao-painel-azul { color: #dce8fb; font-size: 16px; }
+.lista-checklist-login li { color: #dce8fb; }
+.painel-login-form { background: var(--branco); }
+.painel-login-form .caixa-login { box-shadow: none; border: 0; padding: 0; max-width: 380px; border-radius: 0; background: transparent; }
+.titulo-login { font-size: 26px; color: var(--text); }
+.caixa-login h1 { color: var(--text); }
+.caixa-login { border-radius: 14px; box-shadow: 0 6px 18px rgba(15,41,71,.08); border: 1px solid #dfe8f2; }
+.botao-link { color: var(--brand); font-weight: 600; text-decoration: none; text-align: left; }
+.botao-link:hover { color: var(--azul-escuro); text-decoration: underline; }
+.botao-instalar-login { border-radius: var(--raio); height: 42px; font-weight: 600; }
+@media (max-width: 760px) { .titulo-painel-azul { font-size: 26px; } }
+
+/* ---- Rótulos, anexos, listas de marcação, autocomplete e avisos rápidos ---- */
+label { color: var(--text); }
+.secao-anexos { border-top-color: var(--line); }
+.titulo-volume { color: var(--text); font-size: 13px; letter-spacing: .04em; text-transform: uppercase; }
+.linha-anexo { border-radius: 8px; padding: 7px 10px; }
+.linha-anexo:hover { background: #f8fbfe; }
+.lista-checkboxes, .lista-filtro-multi, .lista-autocomplete { border-radius: var(--raio); border-color: var(--line); }
+.item-autocomplete:hover { background: var(--ink); }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--brand); }
+.toast { background: var(--text); border-radius: var(--raio); box-shadow: 0 8px 24px rgba(15, 41, 71, .25); }
+.toast-sucesso { background: var(--verde-sucesso); }
+.toast-erro { background: var(--vermelho-erro); }
+
+/* ---- Árvore de navegação (como o painel de filtros do Portal) ---- */
+.painel-arvore { background: var(--branco); padding: 8px; }
+.botao-arvore-todos { background: var(--ink); color: var(--text); }
+.arvore-item-ano { border-radius: 8px; padding: 7px 10px; }
+.arvore-item-subdivisao { color: var(--text-dim); padding: 5px 10px; }
+.arvore-item-subdivisao:hover { color: var(--brand); }
+
+button, select, input, textarea { font-family: inherit; } /* botões herdam a fonte Inter, como no Portal */
+
 @media (max-width: 820px) {
   .cabecalho-app { padding: 8px 16px; }
   .area-conteudo { padding: 18px 16px 32px; }

@@ -210,6 +210,13 @@ está tudo certo.
 
 ## Changelog
 
+**v8.20** — Varredura de todas as telas no padrão do Portal PNTP: login
+(metade azul lisa/metade branca), escolha da unidade, indicadores do Início e
+Relatórios (faixa colorida no topo), tabelas de relatório, árvore de navegação,
+anexos, listas de marcação, autocomplete e avisos rápidos (toast). Botões e
+campos herdam a fonte Inter. Só CSS (bloco "Padrão SOFT+" no fim de
+`estilos.css`); a lógica não mudou.
+
 **v8.19** — Visual no **padrão SOFT+ do painel do Portal PNTP** (referência
 real: `painel/estilos.css` do repositório portal-pntp). Topo claro; menu
 lateral azul-marinho com pesquisa e grupos coloridos **sempre abertos** (sem

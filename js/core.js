@@ -7,7 +7,7 @@
 // e na tela de login, para facilitar conferir se o navegador já está
 // com a versão mais recente (ajuda a identificar problema de cache).
 // ===================================================================
-const VERSAO_APP = "8.21";
+const VERSAO_APP = "8.22";
 document.addEventListener("DOMContentLoaded", () => {
   const elementoLogin = document.getElementById("versao-app-login");
   if (elementoLogin) elementoLogin.textContent = `v${VERSAO_APP}`;
@@ -269,6 +269,109 @@ function criarPaginador(consultaBase) {
       return !acabou;
     },
   };
+}
+
+// -------------------------------------------------------------
+// PAGINAÇÃO NUMERADA DAS TABELAS (padrão SOFT+, igual ao painel do Portal PNTP)
+// -------------------------------------------------------------
+// Toda tabela de listagem (.tabela-caixa) com mais de LINHAS_POR_PAGINA linhas
+// ganha páginas numeradas ("‹ 1 2 3 … ›" e "Linhas a–b de N"). Convive com o
+// "Carregar mais": a consulta continua trazendo os registros em lotes do
+// servidor (cursor/startAfter) e esta paginação só divide, na tela, o que já foi
+// carregado — por isso nenhuma lista baixa tudo de uma vez. Quando um novo lote
+// chega, a tela pula para a primeira página com linhas novas, para o usuário ver
+// que o "Carregar mais" funcionou.
+const LINHAS_POR_PAGINA = 25;
+
+function paginarTabela(caixa) {
+  const corpo = caixa.querySelector("tbody");
+  if (!corpo) return;
+  const linhas = [...corpo.children];
+  let nav = caixa.nextElementSibling?.classList.contains("paginacao") ? caixa.nextElementSibling : null;
+  const totalPaginas = Math.ceil(linhas.length / LINHAS_POR_PAGINA);
+
+  if (totalPaginas <= 1) {
+    // Lista curta: mostra tudo e remove a navegação, se existir.
+    linhas.forEach((l) => { if (l.dataset.pag) { l.hidden = false; delete l.dataset.pag; } });
+    if (nav) nav.remove();
+    caixa._primeiraLinha = linhas[0];
+    caixa._qtdLinhas = linhas.length;
+    return;
+  }
+
+  let atual = Number(caixa.dataset.pagina || 1);
+  if (caixa._primeiraLinha !== linhas[0]) {
+    atual = 1; // lista nova (busca/filtro): volta para a primeira página
+  } else if (linhas.length > (caixa._qtdLinhas || 0)) {
+    atual = Math.floor((caixa._qtdLinhas || 0) / LINHAS_POR_PAGINA) + 1; // chegou um lote novo
+  }
+  atual = Math.min(atual, totalPaginas);
+  caixa._primeiraLinha = linhas[0];
+  caixa._qtdLinhas = linhas.length;
+
+  const mostrar = (n, rolar) => {
+    caixa.dataset.pagina = n;
+    linhas.forEach((l, k) => { l.dataset.pag = "1"; l.hidden = Math.floor(k / LINHAS_POR_PAGINA) + 1 !== n; });
+
+    const botao = (rotulo, alvo, ariaLabel) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "pag-btn";
+      b.textContent = rotulo;
+      if (ariaLabel) b.setAttribute("aria-label", ariaLabel);
+      if (typeof rotulo === "number" && alvo === n) b.setAttribute("aria-current", "page");
+      else if (alvo < 1 || alvo > totalPaginas) b.disabled = true;
+      b.addEventListener("click", () => mostrar(alvo, true));
+      return b;
+    };
+
+    const novo = document.createElement("nav");
+    novo.className = "paginacao";
+    novo.setAttribute("aria-label", "Páginas da lista");
+    novo.appendChild(botao("‹", n - 1, "Página anterior"));
+    let ultimoFoiReticencias = false;
+    for (let i = 1; i <= totalPaginas; i++) {
+      if (i === 1 || i === totalPaginas || Math.abs(i - n) <= 2) {
+        novo.appendChild(botao(i, i));
+        ultimoFoiReticencias = false;
+      } else if (!ultimoFoiReticencias) {
+        const r = document.createElement("span");
+        r.className = "pag-reticencias";
+        r.textContent = "…";
+        novo.appendChild(r);
+        ultimoFoiReticencias = true;
+      }
+    }
+    novo.appendChild(botao("›", n + 1, "Próxima página"));
+    const info = document.createElement("span");
+    info.className = "pag-info";
+    info.textContent = `Linhas ${(n - 1) * LINHAS_POR_PAGINA + 1}–${Math.min(n * LINHAS_POR_PAGINA, linhas.length)} de ${linhas.length}`;
+    novo.appendChild(info);
+
+    if (nav) nav.replaceWith(novo); else caixa.after(novo);
+    nav = novo;
+    if (rolar) caixa.scrollIntoView({ block: "start", behavior: "smooth" });
+  };
+  mostrar(atual, false);
+}
+
+let paginacaoAutomaticaAtiva = false;
+function ativarPaginacaoAutomatica() {
+  if (paginacaoAutomaticaAtiva) return;
+  paginacaoAutomaticaAtiva = true;
+  const area = document.getElementById("area-conteudo");
+  let pendente = false;
+  new MutationObserver((mutacoes) => {
+    // Ignora as mudanças feitas pela própria paginação (senão entraria em loop).
+    const soNavegacao = mutacoes.every((m) =>
+      [...m.addedNodes, ...m.removedNodes].every((n) => n.nodeType === 1 && n.classList.contains("paginacao")));
+    if (soNavegacao || pendente) return;
+    pendente = true;
+    requestAnimationFrame(() => {
+      pendente = false;
+      area.querySelectorAll(".tabela-caixa").forEach(paginarTabela);
+    });
+  }).observe(area, { childList: true, subtree: true });
 }
 
 // -------------------------------------------------------------
@@ -554,6 +657,7 @@ function montarMenuLateral() {
   menu.appendChild(rodapeVersao);
 
   document.getElementById("versao-app-login").textContent = `v${VERSAO_APP}`;
+  ativarPaginacaoAutomatica();
 
   navegarPara("inicio");
 }

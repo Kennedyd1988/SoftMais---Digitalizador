@@ -210,6 +210,8 @@ está tudo certo.
 
 ## Changelog
 
+**v8.22** — **Paginação numerada** em todas as tabelas de listagem (`.tabela-caixa`), igual ao painel do Portal PNTP: "‹ 1 2 3 … ›" e "Linhas a–b de N", 25 linhas por página. Ela só divide na tela o que já foi carregado; a consulta ao Firestore continua em lotes de 50 com cursor e botão "Carregar mais" (regra do projeto: nunca baixar tudo). Quando um lote novo chega, a tela pula para a primeira página com linhas novas; busca/filtro volta à página 1. Funciona sozinha em qualquer módulo que passe a usar tabela.
+
 **v8.21** — Módulo **Credores/Fornecedores** no padrão SOFT+: a lista deixou
 de ser cartões e virou **tabela** (Nome/Razão social, Tipo, CPF/CNPJ, Contato,
 Ações com "Editar" e "Excluir" em texto), como no painel do Portal PNTP. Os

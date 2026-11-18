@@ -672,6 +672,15 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--brand); }
 .etiqueta { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--ink); color: var(--text-dim); white-space: nowrap; }
 .botao-carregar-mais { margin: 14px auto 0; display: flex; }
 
+/* ---- Paginação numerada das tabelas ---- */
+.paginacao { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 12px 0 4px; }
+.pag-btn { min-width: 34px; height: 34px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--raio); background: var(--branco); color: var(--text); font: inherit; font-size: 14px; cursor: pointer; }
+.pag-btn:hover:not(:disabled) { border-color: var(--brand); }
+.pag-btn[aria-current="page"] { background: #0f2947; border-color: #0f2947; color: #fff; font-weight: 700; }
+.pag-btn:disabled { opacity: .4; cursor: default; }
+.pag-reticencias { padding: 0 4px; color: var(--text-dim); }
+.pag-info { margin-left: 8px; font-size: 13px; color: var(--text-dim); }
+
 button, select, input, textarea { font-family: inherit; } /* botões herdam a fonte Inter, como no Portal */
 
 @media (max-width: 820px) {

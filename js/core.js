@@ -7,7 +7,7 @@
 // e na tela de login, para facilitar conferir se o navegador já está
 // com a versão mais recente (ajuda a identificar problema de cache).
 // ===================================================================
-const VERSAO_APP = "8.24";
+const VERSAO_APP = "8.25";
 document.addEventListener("DOMContentLoaded", () => {
   const elementoLogin = document.getElementById("versao-app-login");
   if (elementoLogin) elementoLogin.textContent = `v${VERSAO_APP}`;
@@ -37,7 +37,9 @@ function escaparHtml(texto) {
   if (texto === null || texto === undefined) return "";
   const div = document.createElement("div");
   div.textContent = String(texto);
-  return div.innerHTML;
+  // Aspas também são escapadas porque o resultado é usado dentro de value="..."
+  // dos formulários; sem isso um nome com aspas quebrava o campo.
+  return div.innerHTML.replace(/"/g, "&quot;");
 }
 
 function normalizarTexto(texto) {

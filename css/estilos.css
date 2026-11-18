@@ -699,3 +699,12 @@ button, select, input, textarea { font-family: inherit; } /* botões herdam a fo
 @media (max-width: 560px) { .grade-form { grid-template-columns: 1fr; } }
 
 .tabela th.col-codigo, .tabela td.col-codigo { width: 140px; }
+
+/* Colunas especiais das tabelas de processos */
+.tabela th.col-selecao, .tabela td.col-selecao { width: 36px; text-align: center; }
+.tabela td.col-selecao input { width: auto; }
+.tabela td.celula-objeto { max-width: 420px; }
+.limite-2-linhas { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.tabela th.num, .tabela td.num { text-align: right; }
+.grade-form #secao-anexos { margin-top: 0; }
+.etiqueta-verde { background: #e7f6ef; color: #066a4a; }

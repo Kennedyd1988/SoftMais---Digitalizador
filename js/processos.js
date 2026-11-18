@@ -382,6 +382,17 @@ async function abrirModalDespesasVinculadas(licitacao, botaoOrigem) {
 }
 
 /** Gera as opções de um <select> de anos, do mais recente pro mais antigo */
+/**
+ * Linha "vazia" para listas em tabela (padrão SOFT+). Descobre sozinha quantas
+ * colunas a tabela tem; se a lista ainda for de cartões (<div>), devolve o
+ * parágrafo antigo, para não quebrar módulos ainda não convertidos.
+ */
+function linhaVaziaTabela(lista, texto) {
+  if (lista.tagName !== "TBODY") return `<p class="texto-secundario">${texto}</p>`;
+  const colunas = lista.closest("table")?.querySelectorAll("thead th").length || 1;
+  return `<tr><td colspan="${colunas}" class="texto-secundario linha-vazia">${texto}</td></tr>`;
+}
+
 function gerarOpcoesAno(anoSelecionado) {
   const anoAtual = new Date().getFullYear();
   let html = `<option value="">Todos os anos</option>`;
@@ -434,8 +445,13 @@ async function renderizarLicitacoes(area) {
     <div class="layout-com-arvore">
       <div id="arvore-navegacao" class="painel-arvore oculto"></div>
       <div class="conteudo-com-arvore">
-        <div id="lista-registros" class="lista-cartoes"></div>
-        <button id="btn-carregar-mais" class="botao-secundario oculto">Carregar mais</button>
+        <div class="tabela-caixa">
+          <table class="tabela">
+            <thead><tr><th class="col-selecao"></th><th>Número/Ano</th><th>Modalidade</th><th>Objeto</th><th>Anexos</th><th class="acoes">Ações</th></tr></thead>
+            <tbody id="lista-registros"></tbody>
+          </table>
+        </div>
+        <button id="btn-carregar-mais" class="botao-secundario botao-carregar-mais oculto">Carregar mais</button>
       </div>
     </div>
   `;
@@ -474,14 +490,14 @@ async function renderizarLicitacoes(area) {
           carregarPagina(true);
           return;
         }
-        lista.innerHTML = `<p class="texto-secundario">Filtrando...</p>`;
+        lista.innerHTML = linhaVaziaTabela(lista, "Filtrando...");
         const snap = await colecaoEntidade("licitacoes").limit(5000).get();
         let registros = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
         if (ano !== null) registros = registros.filter((r) => String(r.ano) === String(ano));
         if (modalidadeNome !== null) registros = registros.filter((r) => r.modalidadeNome === modalidadeNome);
         lista.innerHTML = "";
         registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
-        if (registros.length === 0) lista.innerHTML = `<p class="texto-secundario">Nenhum resultado nessa categoria.</p>`;
+        if (registros.length === 0) lista.innerHTML = linhaVaziaTabela(lista, "Nenhum resultado nessa categoria.");
       });
       arvoreJaCarregada = true;
     } catch (erro) {
@@ -494,7 +510,7 @@ async function renderizarLicitacoes(area) {
     const modalidadeId = document.getElementById("fa-modalidade").value;
     const lista = document.getElementById("lista-registros");
     document.getElementById("btn-carregar-mais").classList.add("oculto");
-    lista.innerHTML = `<p class="texto-secundario">Filtrando...</p>`;
+    lista.innerHTML = linhaVaziaTabela(lista, "Filtrando...");
     try {
       const anoAtivo = document.getElementById("filtro-ano").value;
       const consultaBase = anoAtivo
@@ -506,7 +522,7 @@ async function renderizarLicitacoes(area) {
       if (modalidadeId) registros = registros.filter((r) => r.modalidadeId === modalidadeId);
       lista.innerHTML = "";
       registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
-      if (registros.length === 0) lista.innerHTML = `<p class="texto-secundario">Nenhum resultado encontrado com esses filtros.</p>`;
+      if (registros.length === 0) lista.innerHTML = linhaVaziaTabela(lista, "Nenhum resultado encontrado com esses filtros.");
     } catch (erro) {
       tratarErroConsultaFirestore(erro);
     }
@@ -570,7 +586,7 @@ async function renderizarLicitacoes(area) {
       registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
       document.getElementById("btn-carregar-mais").classList.toggle("oculto", !paginador.temMais);
       if (limpar && registros.length === 0) {
-        lista.innerHTML = `<p class="texto-secundario">Nenhum registro encontrado.</p>`;
+        lista.innerHTML = linhaVaziaTabela(lista, "Nenhum registro encontrado.");
       }
     } catch (erro) {
       tratarErroConsultaFirestore(erro);
@@ -579,71 +595,71 @@ async function renderizarLicitacoes(area) {
   }
 
   function criarCartao(registro) {
-    const cartao = document.createElement("div");
-    cartao.className = "cartao-registro";
-    cartao.innerHTML = `
-      <div class="linha-com-checkbox">
-        <input type="checkbox" class="checkbox-selecao-registro" title="Selecionar pra exportação em lote">
-        <div>
-          <strong>${registro.numero}/${registro.ano}</strong> — ${mapaModalidades[registro.modalidadeId] || "Modalidade não informada"}
-          <div class="texto-secundario">${escaparHtml(registro.objeto)}</div>
-          <div class="texto-secundario">${(registro.anexos || []).length} anexo(s)</div>
-        </div>
-      </div>
-      <div class="acoes-cartao">
-        ${temAnexo(registro) ? `<span class="badge-anexo" title="Tem anexo">📎</span>` : ""}
-        <button class="botao-icone" data-acao="ver-vinculados" title="Ver Despesas Vinculadas">🔗</button>
+    // Devolve uma linha de tabela (nome mantido para não mexer nas chamadas).
+    const linha = document.createElement("tr");
+    linha.className = "linha-clicavel";
+    linha.innerHTML = `
+      <td class="col-selecao"><input type="checkbox" class="checkbox-selecao-registro" title="Selecionar pra exportação em lote"></td>
+      <td class="num"><strong>${escaparHtml(registro.numero)}/${escaparHtml(registro.ano)}</strong></td>
+      <td>${escaparHtml(mapaModalidades[registro.modalidadeId] || "Modalidade não informada")}</td>
+      <td class="celula-objeto"><div class="limite-2-linhas">${escaparHtml(registro.objeto)}</div></td>
+      <td>${(registro.anexos || []).length ? `<span class="etiqueta etiqueta-verde">${(registro.anexos || []).length}</span>` : "—"}</td>
+      <td class="acoes">
+        <button class="botao-secundario botao-pequeno" data-acao="ver-vinculados" title="Ver Despesas Vinculadas">Despesas</button>
         ${
           usuarioPodeEditar()
-            ? `<button class="botao-icone" data-acao="editar">✏️</button>
-               <button class="botao-icone" data-acao="excluir">🗑️</button>`
+            ? `<button class="botao-secundario botao-pequeno" data-acao="editar">Editar</button>
+               <button class="botao-perigo botao-pequeno" data-acao="excluir">Excluir</button>`
             : ""
         }
-      </div>
+      </td>
     `;
-    cartao.querySelector(".checkbox-selecao-registro").addEventListener("click", (evento) => evento.stopPropagation());
-    cartao.querySelector(".checkbox-selecao-registro").addEventListener("change", (evento) =>
+    linha.querySelector(".checkbox-selecao-registro").addEventListener("click", (evento) => evento.stopPropagation());
+    linha.querySelector(".checkbox-selecao-registro").addEventListener("change", (evento) =>
       gerenciadorSelecao.alternarSelecao(registro, evento.target.checked)
     );
-    cartao.querySelector('[data-acao="ver-vinculados"]').addEventListener("click", (evento) => {
+    linha.querySelector('[data-acao="ver-vinculados"]').addEventListener("click", (evento) => {
       evento.stopPropagation();
       abrirModalDespesasVinculadas(registro, evento.currentTarget);
     });
-    cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", (evento) => { evento.stopPropagation(); abrirFormulario(registro); });
-    cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) => {
+    linha.querySelector('[data-acao="editar"]')?.addEventListener("click", (evento) => { evento.stopPropagation(); abrirFormulario(registro); });
+    linha.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) => {
       evento.stopPropagation();
       excluirLicitacao(registro, evento.target);
     });
-    cartao.classList.add("cartao-clicavel");
-    cartao.addEventListener("click", () => abrirFormulario(registro));
-    return cartao;
+    linha.addEventListener("click", () => abrirFormulario(registro));
+    return linha;
   }
 
   function abrirFormulario(registro = null) {
     const modal = criarModal(`${registro ? "Editar" : "Nova"} Licitação`, `
-      <div class="linha-formulario">
-        <div>
-          <label>Número *</label>
-          <input type="text" id="campo-numero" value="${registro?.numero || ""}">
+      <div class="grade-form">
+        <div class="campo-form">
+          <label for="campo-numero">Número *</label>
+          <input type="text" id="campo-numero" value="${escaparHtml(registro?.numero)}">
         </div>
-        <div>
-          <label>Ano *</label>
+        <div class="campo-form">
+          <label for="campo-ano">Ano *</label>
           <input type="number" id="campo-ano" value="${registro?.ano || new Date().getFullYear()}">
         </div>
+        <div class="campo-form span-2">
+          <label for="campo-modalidade">Modalidade *</label>
+          <select id="campo-modalidade">
+            <option value="">Selecione...</option>
+            ${montarOpcoesHtml(modalidades, registro?.modalidadeId)}
+          </select>
+        </div>
+        <div class="campo-form span-2">
+          <label for="campo-objeto">Objeto *</label>
+          <textarea id="campo-objeto" rows="3">${escaparHtml(registro?.objeto)}</textarea>
+        </div>
+        ${
+          registro
+            ? `<div class="campo-form span-2"><button type="button" class="botao-secundario botao-link-vinculado" id="btn-ver-despesas-vinculadas">Ver Despesas Vinculadas</button></div>`
+            : ""
+        }
+        <div id="secao-anexos" class="span-2"></div>
       </div>
-      <label>Modalidade *</label>
-      <select id="campo-modalidade">
-        <option value="">Selecione...</option>
-        ${montarOpcoesHtml(modalidades, registro?.modalidadeId)}
-      </select>
-      <label>Objeto *</label>
-      <textarea id="campo-objeto" rows="3">${registro?.objeto || ""}</textarea>
-      ${
-        registro
-          ? `<button type="button" class="botao-secundario botao-link-vinculado" id="btn-ver-despesas-vinculadas">🔗 Ver Despesas Vinculadas</button>`
-          : ""
-      }
-      <div id="secao-anexos"></div>
     `, async (botaoSalvar) => {
       const campoNumero = document.getElementById("campo-numero");
       const campoModalidade = document.getElementById("campo-modalidade");
@@ -794,7 +810,7 @@ async function renderizarLicitacoes(area) {
 
       registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
       if (registros.length === 0) {
-        lista.innerHTML = `<p class="texto-secundario">Nenhum resultado encontrado.</p>`;
+        lista.innerHTML = linhaVaziaTabela(lista, "Nenhum resultado encontrado.");
       }
     } catch (erro) {
       tratarErroConsultaFirestore(erro);
@@ -849,8 +865,13 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
     <div class="layout-com-arvore">
       <div id="arvore-navegacao" class="painel-arvore oculto"></div>
       <div class="conteudo-com-arvore">
-        <div id="lista-registros" class="lista-cartoes"></div>
-        <button id="btn-carregar-mais" class="botao-secundario oculto">Carregar mais</button>
+        <div class="tabela-caixa">
+          <table class="tabela">
+            <thead><tr><th class="col-selecao"></th><th>Tipo</th><th>Número/Ano</th><th>Objeto</th><th>Anexos</th>${usuarioPodeEditar() ? `<th class="acoes">Ações</th>` : ""}</tr></thead>
+            <tbody id="lista-registros"></tbody>
+          </table>
+        </div>
+        <button id="btn-carregar-mais" class="botao-secundario botao-carregar-mais oculto">Carregar mais</button>
       </div>
     </div>
   `;
@@ -889,14 +910,14 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
           carregarPagina(true);
           return;
         }
-        lista.innerHTML = `<p class="texto-secundario">Filtrando...</p>`;
+        lista.innerHTML = linhaVaziaTabela(lista, "Filtrando...");
         const snap = await colecaoEntidade(nomeColecao).limit(5000).get();
         let registros = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
         if (ano !== null) registros = registros.filter((r) => String(r.ano) === String(ano));
         if (tipoNome !== null) registros = registros.filter((r) => mapaTipos[r.tipoId] === tipoNome);
         lista.innerHTML = "";
         registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
-        if (registros.length === 0) lista.innerHTML = `<p class="texto-secundario">Nenhum resultado nessa categoria.</p>`;
+        if (registros.length === 0) lista.innerHTML = linhaVaziaTabela(lista, "Nenhum resultado nessa categoria.");
       });
       arvoreJaCarregada = true;
     } catch (erro) {
@@ -908,7 +929,7 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
     const tipoId = document.getElementById("fa-tipo").value;
     const lista = document.getElementById("lista-registros");
     document.getElementById("btn-carregar-mais").classList.add("oculto");
-    lista.innerHTML = `<p class="texto-secundario">Filtrando...</p>`;
+    lista.innerHTML = linhaVaziaTabela(lista, "Filtrando...");
     try {
       const anoAtivo = document.getElementById("filtro-ano").value;
       const consultaBase = anoAtivo
@@ -920,7 +941,7 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
       if (tipoId) registros = registros.filter((r) => r.tipoId === tipoId);
       lista.innerHTML = "";
       registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
-      if (registros.length === 0) lista.innerHTML = `<p class="texto-secundario">Nenhum resultado encontrado com esses filtros.</p>`;
+      if (registros.length === 0) lista.innerHTML = linhaVaziaTabela(lista, "Nenhum resultado encontrado com esses filtros.");
     } catch (erro) {
       tratarErroConsultaFirestore(erro);
     }
@@ -980,7 +1001,7 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
       registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
       document.getElementById("btn-carregar-mais").classList.toggle("oculto", !paginador.temMais);
       if (limpar && registros.length === 0) {
-        lista.innerHTML = `<p class="texto-secundario">Nenhum registro encontrado.</p>`;
+        lista.innerHTML = linhaVaziaTabela(lista, "Nenhum registro encontrado.");
       }
     } catch (erro) {
       tratarErroConsultaFirestore(erro);
@@ -989,55 +1010,61 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
   }
 
   function criarCartao(registro) {
-    const cartao = document.createElement("div");
-    cartao.className = "cartao-registro";
-    cartao.innerHTML = `
-      <div class="linha-com-checkbox">
-        <input type="checkbox" class="checkbox-selecao-registro" title="Selecionar pra exportação em lote">
-        <div>
-          <strong>${mapaTipos[registro.tipoId] || "Tipo não informado"} nº ${registro.numero}${registro.ano ? "/" + registro.ano : ""}</strong>
-          <div class="texto-secundario">${escaparHtml(registro.objeto)}</div>
-          <div class="texto-secundario">${(registro.anexos || []).length} anexo(s)</div>
-        </div>
-      </div>
+    // Devolve uma linha de tabela (nome mantido para não mexer nas chamadas).
+    const linha = document.createElement("tr");
+    linha.className = "linha-clicavel";
+    linha.innerHTML = `
+      <td class="col-selecao"><input type="checkbox" class="checkbox-selecao-registro" title="Selecionar pra exportação em lote"></td>
+      <td><strong>${escaparHtml(mapaTipos[registro.tipoId] || "Tipo não informado")}</strong></td>
+      <td class="num">${escaparHtml(registro.numero)}${registro.ano ? "/" + escaparHtml(registro.ano) : ""}</td>
+      <td class="celula-objeto"><div class="limite-2-linhas">${escaparHtml(registro.objeto)}</div></td>
+      <td>${(registro.anexos || []).length ? `<span class="etiqueta etiqueta-verde">${(registro.anexos || []).length}</span>` : "—"}</td>
       ${
         usuarioPodeEditar()
-          ? `<div class="acoes-cartao">
-               ${temAnexo(registro) ? `<span class="badge-anexo" title="Tem anexo">📎</span>` : ""}
-               <button class="botao-icone" data-acao="editar">✏️</button>
-               <button class="botao-icone" data-acao="excluir">🗑️</button>
-             </div>`
+          ? `<td class="acoes">
+               <button class="botao-secundario botao-pequeno" data-acao="editar">Editar</button>
+               <button class="botao-perigo botao-pequeno" data-acao="excluir">Excluir</button>
+             </td>`
           : ""
       }
     `;
-    cartao.querySelector(".checkbox-selecao-registro").addEventListener("click", (evento) => evento.stopPropagation());
-    cartao.querySelector(".checkbox-selecao-registro").addEventListener("change", (evento) =>
+    linha.querySelector(".checkbox-selecao-registro").addEventListener("click", (evento) => evento.stopPropagation());
+    linha.querySelector(".checkbox-selecao-registro").addEventListener("change", (evento) =>
       gerenciadorSelecao.alternarSelecao(registro, evento.target.checked)
     );
-    cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", (evento) => { evento.stopPropagation(); abrirFormulario(registro); });
-    cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) => {
+    linha.querySelector('[data-acao="editar"]')?.addEventListener("click", (evento) => { evento.stopPropagation(); abrirFormulario(registro); });
+    linha.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) => {
       evento.stopPropagation();
       excluirRegistroModulo(registro, evento.target);
     });
-    cartao.classList.add("cartao-clicavel");
-    cartao.addEventListener("click", () => abrirFormulario(registro));
-    return cartao;
+    linha.addEventListener("click", () => abrirFormulario(registro));
+    return linha;
   }
 
   function abrirFormulario(registro = null) {
     const modal = criarModal(`${registro ? "Editar" : "Novo"} ${tituloSingular}`, `
-      <label>Tipo *</label>
-      <select id="campo-tipo">
-        <option value="">Selecione...</option>
-        ${montarOpcoesHtml(tipos, registro?.tipoId)}
-      </select>
-      <label>Número *</label>
-      <input type="text" id="campo-numero" value="${registro?.numero || ""}">
-      <label>Ano *</label>
-      <input type="number" id="campo-ano" value="${registro?.ano || new Date().getFullYear()}">
-      <label>Objeto *</label>
-      <textarea id="campo-objeto" rows="3">${registro?.objeto || ""}</textarea>
-      <div id="secao-anexos"></div>
+      <div class="grade-form">
+        <div class="campo-form span-2">
+          <label for="campo-tipo">Tipo *</label>
+          <select id="campo-tipo">
+            <option value="">Selecione...</option>
+            ${montarOpcoesHtml(tipos, registro?.tipoId)}
+          </select>
+        </div>
+        <div class="campo-form">
+          <label for="campo-numero">Número *</label>
+          <input type="text" id="campo-numero" value="${escaparHtml(registro?.numero)}">
+        </div>
+        <div class="campo-form">
+          <label for="campo-ano">Ano *</label>
+          <input type="number" id="campo-ano" value="${registro?.ano || new Date().getFullYear()}">
+        </div>
+        <div class="campo-form span-2">
+          <label for="campo-objeto">Objeto *</label>
+          <textarea id="campo-objeto" rows="3">${escaparHtml(registro?.objeto)}</textarea>
+        </div>
+        <div id="secao-anexos" class="span-2"></div>
+      </div>
     `, async (botaoSalvar) => {
       const campoTipo = document.getElementById("campo-tipo");
       const campoNumero = document.getElementById("campo-numero");
@@ -1153,7 +1180,7 @@ async function renderizarModuloTipoNumeroObjeto(area, nomeColecao, tituloSingula
 
       registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
       if (registros.length === 0) {
-        lista.innerHTML = `<p class="texto-secundario">Nenhum resultado encontrado.</p>`;
+        lista.innerHTML = linhaVaziaTabela(lista, "Nenhum resultado encontrado.");
       }
     } catch (erro) {
       tratarErroConsultaFirestore(erro);
@@ -1224,8 +1251,13 @@ async function renderizarDespesas(area) {
     <div class="layout-com-arvore">
       <div id="arvore-navegacao" class="painel-arvore oculto"></div>
       <div class="conteudo-com-arvore">
-        <div id="lista-registros" class="lista-cartoes"></div>
-        <button id="btn-carregar-mais" class="botao-secundario oculto">Carregar mais</button>
+        <div class="tabela-caixa">
+          <table class="tabela">
+            <thead><tr><th class="col-selecao"></th><th>Empenho</th><th>Credor</th><th>Objeto</th><th class="num">Valor</th><th>Pagamento</th><th>Anexos</th><th class="acoes">Ações</th></tr></thead>
+            <tbody id="lista-registros"></tbody>
+          </table>
+        </div>
+        <button id="btn-carregar-mais" class="botao-secundario botao-carregar-mais oculto">Carregar mais</button>
       </div>
     </div>
   `;
@@ -1268,14 +1300,14 @@ async function renderizarDespesas(area) {
           carregarPagina(true);
           return;
         }
-        lista.innerHTML = `<p class="texto-secundario">Filtrando...</p>`;
+        lista.innerHTML = linhaVaziaTabela(lista, "Filtrando...");
         const snap = await colecaoEntidade("processosDespesa").limit(5000).get();
         let registros = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
         if (ano !== null) registros = registros.filter((r) => (r.competenciaKey || "").startsWith(ano));
         if (unidadeNome !== null) registros = registros.filter((r) => mapaUnidadePorIdParaArvore[r.unidadeOrcamentariaId] === unidadeNome);
         lista.innerHTML = "";
         registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
-        if (registros.length === 0) lista.innerHTML = `<p class="texto-secundario">Nenhum resultado nessa categoria.</p>`;
+        if (registros.length === 0) lista.innerHTML = linhaVaziaTabela(lista, "Nenhum resultado nessa categoria.");
       });
       arvoreJaCarregada = true;
     } catch (erro) {
@@ -1302,7 +1334,7 @@ async function renderizarDespesas(area) {
 
     const lista = document.getElementById("lista-registros");
     document.getElementById("btn-carregar-mais").classList.add("oculto");
-    lista.innerHTML = `<p class="texto-secundario">Filtrando...</p>`;
+    lista.innerHTML = linhaVaziaTabela(lista, "Filtrando...");
 
     try {
       const anoAtivo = document.getElementById("filtro-ano").value;
@@ -1325,7 +1357,7 @@ async function renderizarDespesas(area) {
 
       lista.innerHTML = "";
       registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
-      if (registros.length === 0) lista.innerHTML = `<p class="texto-secundario">Nenhum resultado encontrado com esses filtros.</p>`;
+      if (registros.length === 0) lista.innerHTML = linhaVaziaTabela(lista, "Nenhum resultado encontrado com esses filtros.");
     } catch (erro) {
       tratarErroConsultaFirestore(erro);
     }
@@ -1484,7 +1516,7 @@ async function renderizarDespesas(area) {
       registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
       document.getElementById("btn-carregar-mais").classList.toggle("oculto", !paginador.temMais);
       if (limpar && registros.length === 0) {
-        lista.innerHTML = `<p class="texto-secundario">Nenhum registro encontrado.</p>`;
+        lista.innerHTML = linhaVaziaTabela(lista, "Nenhum registro encontrado.");
       }
     } catch (erro) {
       tratarErroConsultaFirestore(erro);
@@ -1493,126 +1525,123 @@ async function renderizarDespesas(area) {
   }
 
   function criarCartao(registro) {
-    const cartao = document.createElement("div");
-    cartao.className = "cartao-registro";
-    cartao.innerHTML = `
-      <div class="linha-com-checkbox">
-        <input type="checkbox" class="checkbox-selecao-registro" title="Selecionar pra exportação em lote">
-        <div>
-          <strong>Empenho ${registro.numeroEmpenho}</strong> — ${registro.credorNome || ""}
-          <div class="texto-secundario">${escaparHtml(registro.objeto)}</div>
-          <div class="texto-secundario">${formatarMoeda(registro.valor)} · Pagamento em ${formatarData(registro.dataPagamento)}</div>
-          <div class="texto-secundario">Ordem de Pagamento: ${registro.ordemPagamento || "-"} · Elemento: <span class="num">${registro.elementoDespesa || "-"}</span></div>
-          <div class="texto-secundario">${(registro.anexos || []).length} anexo(s)</div>
-        </div>
-      </div>
-      <div class="acoes-cartao">
-        ${temAnexo(registro) ? `<span class="badge-anexo" title="Tem anexo">📎</span>` : ""}
-        ${registro.licitacaoId ? `<button class="botao-icone" data-acao="ver-vinculada" title="Ver Licitação vinculada">🔗</button>` : ""}
+    // Devolve uma linha de tabela (nome mantido para não mexer nas chamadas).
+    const linha = document.createElement("tr");
+    linha.className = "linha-clicavel";
+    linha.innerHTML = `
+      <td class="col-selecao"><input type="checkbox" class="checkbox-selecao-registro" title="Selecionar pra exportação em lote"></td>
+      <td>
+        <strong>${escaparHtml(registro.numeroEmpenho)}</strong>
+        <div class="texto-secundario">OP: ${escaparHtml(registro.ordemPagamento) || "-"} · Elem.: <span class="num">${escaparHtml(registro.elementoDespesa) || "-"}</span></div>
+      </td>
+      <td>${escaparHtml(registro.credorNome)}</td>
+      <td class="celula-objeto"><div class="limite-2-linhas">${escaparHtml(registro.objeto)}</div></td>
+      <td class="num">${formatarMoeda(registro.valor)}</td>
+      <td class="num">${formatarData(registro.dataPagamento)}</td>
+      <td>${(registro.anexos || []).length ? `<span class="etiqueta etiqueta-verde">${(registro.anexos || []).length}</span>` : "—"}</td>
+      <td class="acoes">
+        ${registro.licitacaoId ? `<button class="botao-secundario botao-pequeno" data-acao="ver-vinculada" title="Ver Licitação vinculada">Licitação</button>` : ""}
         ${
           usuarioPodeEditar()
-            ? `<button class="botao-icone" data-acao="editar">✏️</button>
-               <button class="botao-icone" data-acao="excluir">🗑️</button>`
+            ? `<button class="botao-secundario botao-pequeno" data-acao="editar">Editar</button>
+               <button class="botao-perigo botao-pequeno" data-acao="excluir">Excluir</button>`
             : ""
         }
-      </div>
+      </td>
     `;
-    cartao.querySelector(".checkbox-selecao-registro").addEventListener("click", (evento) => evento.stopPropagation());
-    cartao.querySelector(".checkbox-selecao-registro").addEventListener("change", (evento) =>
+    linha.querySelector(".checkbox-selecao-registro").addEventListener("click", (evento) => evento.stopPropagation());
+    linha.querySelector(".checkbox-selecao-registro").addEventListener("change", (evento) =>
       gerenciadorSelecao.alternarSelecao(registro, evento.target.checked)
     );
-    cartao.querySelector('[data-acao="ver-vinculada"]')?.addEventListener("click", (evento) => {
+    linha.querySelector('[data-acao="ver-vinculada"]')?.addEventListener("click", (evento) => {
       evento.stopPropagation();
       abrirModalResumoLicitacaoVinculada(registro.licitacaoId, evento.currentTarget);
     });
-    cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", (evento) => { evento.stopPropagation(); abrirFormulario(registro); });
-    cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) => {
+    linha.querySelector('[data-acao="editar"]')?.addEventListener("click", (evento) => { evento.stopPropagation(); abrirFormulario(registro); });
+    linha.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) => {
       evento.stopPropagation();
       excluirDespesa(registro, evento.target);
     });
-    cartao.classList.add("cartao-clicavel");
-    cartao.addEventListener("click", () => abrirFormulario(registro));
-    return cartao;
+    linha.addEventListener("click", () => abrirFormulario(registro));
+    return linha;
   }
 
   function abrirFormulario(registro = null) {
     const modal = criarModal(`${registro ? "Editar" : "Novo"} Processo de Despesa`, `
-      <label>Número do Empenho *</label>
-      <input type="text" id="campo-numero-empenho" value="${registro?.numeroEmpenho || ""}">
-
-      <div class="linha-formulario">
-        <div>
-          <label>Ordem de Pagamento</label>
-          <input type="text" id="campo-ordem-pagamento" value="${registro?.ordemPagamento || ""}">
+      <div class="grade-form">
+        <div class="campo-form span-2">
+          <label for="campo-numero-empenho">Número do Empenho *</label>
+          <input type="text" id="campo-numero-empenho" value="${escaparHtml(registro?.numeroEmpenho)}">
         </div>
-        <div>
-          <label>Elemento de Despesa</label>
-          <input type="text" id="campo-elemento-despesa" placeholder="Ex: 3.3.90.30.00" value="${registro?.elementoDespesa || ""}">
+        <div class="campo-form">
+          <label for="campo-ordem-pagamento">Ordem de Pagamento</label>
+          <input type="text" id="campo-ordem-pagamento" value="${escaparHtml(registro?.ordemPagamento)}">
         </div>
-      </div>
-
-      <label>Credor/Fornecedor *</label>
-      <input type="text" id="campo-credor-busca" placeholder="Digite para buscar..." value="${registro?.credorNome || ""}" autocomplete="off">
-      <input type="hidden" id="campo-credor-id" value="${registro?.credorId || ""}">
-      <div id="resultados-credor" class="lista-autocomplete oculto"></div>
-
-      <div class="linha-formulario">
-        <div>
-          <label>Unidade Orçamentária *</label>
+        <div class="campo-form">
+          <label for="campo-elemento-despesa">Elemento de Despesa</label>
+          <input type="text" id="campo-elemento-despesa" placeholder="Ex: 3.3.90.30.00" value="${escaparHtml(registro?.elementoDespesa)}">
+        </div>
+        <div class="campo-form span-2">
+          <label for="campo-credor-busca">Credor/Fornecedor *</label>
+          <input type="text" id="campo-credor-busca" placeholder="Digite para buscar..." value="${escaparHtml(registro?.credorNome)}" autocomplete="off">
+          <input type="hidden" id="campo-credor-id" value="${escaparHtml(registro?.credorId)}">
+          <div id="resultados-credor" class="lista-autocomplete oculto"></div>
+        </div>
+        <div class="campo-form">
+          <label for="campo-unidade-orc">Unidade Orçamentária *</label>
           <select id="campo-unidade-orc">
             <option value="">Selecione...</option>
             ${montarOpcoesHtml(unidadesOrc, registro?.unidadeOrcamentariaId)}
           </select>
         </div>
-        <div>
-          <label>Fonte de Recurso *</label>
+        <div class="campo-form">
+          <label for="campo-fonte-recurso">Fonte de Recurso *</label>
           <select id="campo-fonte-recurso">
             <option value="">Selecione...</option>
             ${montarOpcoesHtml(fontesRecurso, registro?.fonteRecursoId)}
           </select>
         </div>
-      </div>
-
-      <label>Licitação de origem *</label>
-      <input type="text" id="campo-licitacao-busca" placeholder="Digite número/ano para vincular..." value="${registro?.licitacaoIdentificador || ""}" autocomplete="off" ${registro?.semLicitacaoVinculada ? "disabled" : ""}>
-      <input type="hidden" id="campo-licitacao-id" value="${registro?.licitacaoId || ""}">
-      <div id="resultados-licitacao" class="lista-autocomplete oculto"></div>
-      <label class="item-checkbox" style="margin-top:8px">
-        <input type="checkbox" id="campo-sem-licitacao" ${registro?.semLicitacaoVinculada ? "checked" : ""}>
-        Processo sem licitação vinculada
-      </label>
-      ${
-        registro?.licitacaoId
-          ? `<button type="button" class="botao-secundario botao-link-vinculado" id="btn-ver-licitacao-vinculada">🔗 Ver Licitação vinculada</button>`
-          : ""
-      }
-
-      <label>Folha vinculada (opcional)</label>
-      <input type="text" id="campo-folha-busca" placeholder="Digite pra buscar uma folha..." value="${registro?.folhaNome || ""}" autocomplete="off">
-      <input type="hidden" id="campo-folha-id" value="${registro?.folhaId || ""}">
-      <div id="resultados-folha" class="lista-autocomplete oculto"></div>
-      <p class="texto-secundario" style="margin-top:4px">Vincular a uma Folha liga esta despesa a todos os servidores dela, sem precisar vincular um por um.</p>
-      ${
-        registro?.folhaId
-          ? `<button type="button" class="botao-secundario botao-link-vinculado" id="btn-ver-servidores-folha">🔗 Ver Servidores da Folha</button>`
-          : ""
-      }
-
-      <label>Objeto *</label>
-      <textarea id="campo-objeto" rows="3">${registro?.objeto || ""}</textarea>
-
-      <div class="linha-formulario">
-        <div>
-          <label>Data do Pagamento</label>
-          <input type="date" id="campo-data-pagamento" value="${registro?.dataPagamento || ""}">
+        <div class="campo-form span-2">
+          <label for="campo-licitacao-busca">Licitação de origem *</label>
+          <input type="text" id="campo-licitacao-busca" placeholder="Digite número/ano para vincular..." value="${escaparHtml(registro?.licitacaoIdentificador)}" autocomplete="off" ${registro?.semLicitacaoVinculada ? "disabled" : ""}>
+          <input type="hidden" id="campo-licitacao-id" value="${escaparHtml(registro?.licitacaoId)}">
+          <div id="resultados-licitacao" class="lista-autocomplete oculto"></div>
+          <label class="item-checkbox" style="margin-top:8px">
+            <input type="checkbox" id="campo-sem-licitacao" ${registro?.semLicitacaoVinculada ? "checked" : ""}>
+            Processo sem licitação vinculada
+          </label>
+          ${
+            registro?.licitacaoId
+              ? `<button type="button" class="botao-secundario botao-link-vinculado" id="btn-ver-licitacao-vinculada">Ver Licitação vinculada</button>`
+              : ""
+          }
         </div>
-        <div>
-          <label>Valor (R$)</label>
-          <input type="number" step="0.01" id="campo-valor" value="${registro?.valor || ""}">
+        <div class="campo-form span-2">
+          <label for="campo-folha-busca">Folha vinculada (opcional)</label>
+          <input type="text" id="campo-folha-busca" placeholder="Digite pra buscar uma folha..." value="${escaparHtml(registro?.folhaNome)}" autocomplete="off">
+          <input type="hidden" id="campo-folha-id" value="${escaparHtml(registro?.folhaId)}">
+          <div id="resultados-folha" class="lista-autocomplete oculto"></div>
+          <p class="texto-secundario" style="margin-top:4px">Vincular a uma Folha liga esta despesa a todos os servidores dela, sem precisar vincular um por um.</p>
+          ${
+            registro?.folhaId
+              ? `<button type="button" class="botao-secundario botao-link-vinculado" id="btn-ver-servidores-folha">Ver Servidores da Folha</button>`
+              : ""
+          }
         </div>
+        <div class="campo-form span-2">
+          <label for="campo-objeto">Objeto *</label>
+          <textarea id="campo-objeto" rows="3">${escaparHtml(registro?.objeto)}</textarea>
+        </div>
+        <div class="campo-form">
+          <label for="campo-data-pagamento">Data do Pagamento</label>
+          <input type="date" id="campo-data-pagamento" value="${escaparHtml(registro?.dataPagamento)}">
+        </div>
+        <div class="campo-form">
+          <label for="campo-valor">Valor (R$)</label>
+          <input type="number" step="0.01" id="campo-valor" value="${registro?.valor ?? ""}">
+        </div>
+        <div id="secao-anexos" class="span-2"></div>
       </div>
-
-      <div id="secao-anexos"></div>
     `, async (botaoSalvar) => {
       const campoNumeroEmpenho = document.getElementById("campo-numero-empenho");
       const campoOrdemPagamento = document.getElementById("campo-ordem-pagamento");
@@ -1808,7 +1837,7 @@ async function renderizarDespesas(area) {
 
       registros.forEach((registro) => lista.appendChild(criarCartao(registro)));
       if (registros.length === 0) {
-        lista.innerHTML = `<p class="texto-secundario">Nenhum resultado encontrado.</p>`;
+        lista.innerHTML = linhaVaziaTabela(lista, "Nenhum resultado encontrado.");
       }
     } catch (erro) {
       tratarErroConsultaFirestore(erro);
@@ -2063,7 +2092,7 @@ function configurarBuscaGenerica(nomeColecao, criarCartao, paginador, carregarPa
           .get();
         snapshot.docs.forEach((doc) => lista.appendChild(criarCartao({ id: doc.id, ...doc.data() })));
         if (snapshot.empty) {
-          lista.innerHTML = `<p class="texto-secundario">Nenhum resultado encontrado.</p>`;
+          lista.innerHTML = linhaVaziaTabela(lista, "Nenhum resultado encontrado.");
         }
         document.getElementById("btn-carregar-mais").classList.add("oculto");
       } catch (erro) {

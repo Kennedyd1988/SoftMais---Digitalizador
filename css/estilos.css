@@ -512,3 +512,99 @@ input:focus, select:focus, textarea:focus {
   .titulo-app-texto { display: none; } /* esconde o texto "Indexação de Documentos", só o símbolo fica, pra sobrar espaço pro nome do ente */
   .seletor-entidade { max-width: 170px; }
 }
+
+/* =====================================================================
+   Padrão SOFT+ v8.19 — mesmo desenho do painel do Portal PNTP
+   (referência real: painel/estilos.css do repositório portal-pntp).
+   Fica num bloco só, no fim do arquivo, para sobrescrever o visual antigo
+   sem mexer na lógica. Para voltar ao visual anterior basta apagar este bloco
+   (e restaurar o montarMenuLateral do core.js).
+   ===================================================================== */
+:root { --acento: #0a9668; --raio: 10px; }
+body { font-size: 15px; line-height: 1.5; }
+:focus-visible { outline: 3px solid #f2b33d; outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+/* Topo claro, como o do Portal */
+.cabecalho-app { background: var(--branco); color: var(--text); border-bottom: 1px solid var(--line); padding: 10px 24px; }
+.titulo-app { color: var(--text); }
+.botao-icone-menu { color: var(--text); border: 1px solid var(--line); border-radius: var(--raio); width: 42px; height: 42px; background: var(--branco); font-size: 18px; }
+.nome-usuario { color: var(--text-dim); opacity: 1; }
+.seletor-entidade { height: 40px; }
+.botao-sair, .botao-instalar { background: none; border: 1px solid transparent; color: var(--text-dim); border-radius: var(--raio); padding: 6px 10px; font-size: 14px; }
+.botao-sair:hover, .botao-instalar:hover { border-color: var(--line); color: var(--text); background: var(--branco); }
+
+/* Menu lateral escuro com grupos coloridos e sempre abertos */
+.menu-lateral { width: 256px; flex: 0 0 256px; background: #0f2947; color: #fff; border-right: 0; padding: 18px 12px; }
+.menu-pesquisa { margin-bottom: 4px; }
+.menu-pesquisa input { height: 36px; border: 1px solid #2c4e78; border-radius: 8px; background: #16365c; color: #fff; padding: 0 10px; font-size: 14px; }
+.menu-pesquisa input::placeholder { color: #9fb4cc; }
+.menu-pesquisa input:focus { outline: 2px solid #7fb0ff; outline-offset: 1px; border-color: #2c4e78; }
+.menu-bloco { margin-top: 10px; --g: #5aa0ff; }
+/* O 1º <div> do menu é o campo de pesquisa, por isso o 1º grupo é o 2º div (azul). */
+.menu-bloco:nth-of-type(5n+3) { --g: #a993ff; } .menu-bloco:nth-of-type(5n+4) { --g: #3fd0a0; }
+.menu-bloco:nth-of-type(5n+5) { --g: #f2b33d; } .menu-bloco:nth-of-type(5n+1) { --g: #ff8fb1; }
+.menu-grupo { display: block; margin: 0 0 4px; padding: 7px 10px; font-size: 11.5px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: #fff; background: rgba(255,255,255,.06); border-left: 3px solid var(--g); border-radius: 0 6px 6px 0; }
+.icone-menu { display: none; }
+.item-menu { position: relative; color: #d2deeb; padding: 7px 10px 7px 22px; border-radius: 8px; font-size: 13.5px; margin-bottom: 0; font-family: inherit; }
+.item-menu[hidden] { display: none; }
+.itens-grupo-menu .item-menu::before { content: ""; position: absolute; left: 11px; top: 50%; width: 5px; height: 5px; border-radius: 50%; background: color-mix(in srgb, var(--g) 55%, #0f2947); transform: translateY(-50%); }
+.item-menu:hover { background: #18385f; color: #fff; }
+.itens-grupo-menu .item-menu:hover::before, .itens-grupo-menu .item-menu-ativo::before { background: var(--g); }
+.item-menu-ativo, .item-menu-ativo:hover { background: #24497a; color: #fff; font-weight: 600; }
+.itens-grupo-menu .item-menu-ativo { box-shadow: inset 3px 0 0 var(--g); }
+.menu-lateral > .item-menu { font-weight: 600; padding-left: 10px; }
+.menu-lateral > .item-menu-ativo { box-shadow: inset 3px 0 0 var(--acento); }
+.versao-app { color: #8ea6c2; font-family: 'IBM Plex Mono', monospace; }
+.menu-lateral .versao-app { text-align: left; padding: 14px 10px 0; }
+
+/* Conteúdo */
+.area-conteudo { padding: 26px 24px 40px; }
+.cabecalho-pagina h2 { font-size: 28px; line-height: 1.2; color: var(--text); }
+.cabecalho-pagina h2::before { content: ""; display: block; width: 36px; height: 4px; border-radius: 99px; background: var(--acento); margin: 0 0 12px; }
+
+/* Botões e campos */
+.botao-primario, .botao-secundario, .botao-perigo { height: 42px; padding: 0 16px; border-radius: var(--raio); display: inline-flex; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; }
+.botao-primario:hover:not(:disabled) { background: var(--azul-escuro); }
+.botao-secundario { background: var(--branco); color: var(--text); border: 1px solid var(--line); }
+.botao-secundario:hover { background: #f3f7fc; border-color: #a9bdd3; }
+.botao-filtro-ativo { background: var(--azul-principal); color: var(--branco); border-color: var(--azul-principal); }
+.barra-selecao .botao-secundario { background: rgba(255,255,255,.15); color: var(--branco); border-color: transparent; }
+input, select, textarea { border-radius: var(--raio); color: var(--text); background: var(--branco); }
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select { height: 44px; padding: 0 12px; }
+textarea { padding: 10px 12px; }
+input:focus, select:focus, textarea:focus { border-color: var(--acento); box-shadow: 0 0 0 3px color-mix(in srgb, var(--acento) 20%, transparent); }
+.campo-invalido { box-shadow: 0 0 0 1px var(--vermelho-erro); }
+
+/* Cartões, listas e árvore */
+.cartao-registro, .cartao-boas-vindas, .cartao-manutencao, .painel-arvore { border-radius: 14px; border-color: #dfe8f2; box-shadow: 0 6px 18px rgba(15,41,71,.05); }
+.cartao-clicavel:hover { box-shadow: 0 8px 18px rgba(15,41,71,.07); border-color: #c9d8e8; }
+.cartao-manutencao h3 { position: relative; padding-left: 14px; color: var(--text); font-family: 'Source Serif 4', Georgia, serif; font-size: 18px; }
+.cartao-manutencao h3::before { content: ""; position: absolute; left: 0; top: .15em; bottom: .15em; width: 4px; border-radius: 99px; background: var(--acento); }
+
+/* Janela interna (modal) — mesmo desenho do .dialogo do Portal */
+.fundo-modal { background: rgba(15, 41, 71, .45); align-items: center; }
+.caixa-modal { max-width: 680px; border-radius: 14px; box-shadow: 0 20px 60px rgba(15, 41, 71, .35); max-height: calc(100vh - 32px); display: flex; flex-direction: column; overflow: hidden; }
+.cabecalho-modal { background: var(--branco); }
+.cabecalho-modal h3 { color: var(--text); font-size: 20px; font-family: 'Source Serif 4', Georgia, serif; }
+.botao-fechar-modal { font-size: 26px; line-height: 1; color: var(--text-dim); width: 40px; height: 40px; border-radius: var(--raio); }
+.botao-fechar-modal:hover { background: var(--ink); }
+.corpo-modal { overflow-y: auto; }
+.rodape-modal { background: var(--branco); flex-wrap: wrap; gap: 8px; }
+.botao-perigo { border-color: transparent; background: transparent; }
+.botao-perigo:hover { background: #fdecec; border-color: #f2c4c4; }
+
+/* Abas no estilo guia de navegador (aba aberta branca, faixa azul no topo) */
+.abas-manutencao { display: flex; align-items: flex-end; gap: 2px; border-bottom: 1px solid var(--line); padding: 6px 4px 0; margin: 4px 0 0; overflow-x: auto; flex-wrap: nowrap; }
+.aba-manutencao-botao { flex: none; position: relative; height: 40px; padding: 0 16px; margin-bottom: -1px; border: 1px solid transparent; border-bottom: 0; border-radius: 10px 10px 0 0; background: transparent; color: var(--text-dim); font-weight: 600; font-size: 14px; white-space: nowrap; }
+.aba-manutencao-botao:hover { background: #e2ebf5; color: var(--text); }
+.aba-manutencao-ativa, .aba-manutencao-ativa:hover { height: 44px; background: var(--branco); border-color: var(--line); color: var(--text); z-index: 1; box-shadow: inset 0 3px 0 var(--brand); }
+.aba-manutencao-ativa::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--branco); }
+.abas-manutencao + * { margin-top: 16px; }
+
+@media (max-width: 820px) {
+  .cabecalho-app { padding: 8px 16px; }
+  .area-conteudo { padding: 18px 16px 32px; }
+  .menu-lateral.menu-aberto { box-shadow: 0 0 0 9999px rgba(15, 41, 71, .4); }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

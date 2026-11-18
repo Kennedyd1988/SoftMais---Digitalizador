@@ -210,6 +210,35 @@ está tudo certo.
 
 ## Changelog
 
+**v8.19** — Visual no **padrão SOFT+ do painel do Portal PNTP** (referência
+real: `painel/estilos.css` do repositório portal-pntp). Topo claro; menu
+lateral azul-marinho com pesquisa e grupos coloridos **sempre abertos** (sem
+recolher, como no Portal); títulos com traço verde; botões, campos, cartões e
+janelas internas com o mesmo desenho; abas no estilo guia de navegador (aba
+aberta branca com faixa azul no topo). Tudo ficou num bloco único no fim de
+`css/estilos.css`, e só o `montarMenuLateral` do `core.js` mudou. Para voltar
+ao visual anterior: apagar o bloco "Padrão SOFT+ v8.19" e restaurar o menu
+antigo. Entregue primeiro num repositório/ramo de teste, antes da `main`.
+
+**v8.18** — A exportação em pastas passou a incluir **Processos de Pessoal**
+(Ano / Tipo / "competência - servidor - observações") e **Atos
+Administrativos** (Ano / Tipo / "Tipo nº X-ano - descrição"). Servidores e
+Folhas não entram porque não têm PDFs. Esses módulos filtram pelo campo
+`exercicio` (não `ano`); quando vazio, usa-se a competência/data de emissão.
+
+**v8.17** — Nova tela **Relatórios → Exportar PDFs em Pastas**. Gera .zip
+com a estrutura Módulo / Ano / Subdivisão / Registro / "Vol N - arquivo.pdf"
+(Licitações → modalidade; Despesas → unidade orçamentária; Legislação e
+Documentos Diversos → tipo). Filtros: módulos, ano inicial/final, texto, e
+desmarcação por subdivisão após uma tela de conferência (quantidade e MB).
+Sem filtro, exporta tudo. Divide automaticamente em partes de ~1,2 GB porque
+o navegador monta o zip em memória e falha acima disso. Inclui `_indice.csv`
+e `_arquivos_com_erro.txt`. Nomes de pasta são higienizados para Windows e
+limitados em tamanho (caminho máximo de 260 caracteres). Limitação: o zip
+é montado no navegador; acervos muito grandes devem ser exportados por
+ano/módulo. Pode exigir índice composto na 1ª vez em Despesas com filtro
+de período (o Firestore mostra o link no console).
+
 **v8.16** — A mesma árvore de navegação (Ano → categoria) agora também
 em **Legislação** e **Documentos Diversos** — botão "🌳 Navegar por
 Ano/Tipo" (Ano → Tipo de Documento). Como os dois módulos compartilham

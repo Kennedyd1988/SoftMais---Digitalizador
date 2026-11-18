@@ -7,7 +7,7 @@
 // e na tela de login, para facilitar conferir se o navegador já está
 // com a versão mais recente (ajuda a identificar problema de cache).
 // ===================================================================
-const VERSAO_APP = "8.16";
+const VERSAO_APP = "8.19";
 document.addEventListener("DOMContentLoaded", () => {
   const elementoLogin = document.getElementById("versao-app-login");
   if (elementoLogin) elementoLogin.textContent = `v${VERSAO_APP}`;
@@ -463,6 +463,7 @@ const ITENS_MENU = [
 
   { chave: "relatorios", rotulo: "Relatórios", icone: "📊", modulo: "relatorios", grupo: "Relatórios" },
   { chave: "relatorios-detalhados", rotulo: "Relatórios Detalhados", icone: "🔎", modulo: "relatorios", grupo: "Relatórios" },
+  { chave: "exportar-pastas", rotulo: "Exportar PDFs em Pastas", icone: "📦", modulo: "relatorios", grupo: "Relatórios" },
 
   { chave: "usuarios", rotulo: "Usuários", icone: "👤", modulo: "usuarios", somenteAdmin: true, grupo: "Administração" },
   { chave: "unidades-gestoras", rotulo: "Unidades Gestoras", icone: "🏢", modulo: "unidadesGestoras", somenteAdmin: true, grupo: "Administração" },
@@ -485,6 +486,13 @@ function montarMenuLateral() {
   const menu = document.getElementById("menu-lateral");
   menu.innerHTML = "";
 
+  // Padrão SOFT+ (igual ao painel do Portal PNTP): campo de pesquisa no topo do menu
+  // e grupos SEMPRE abertos, sem recolher — por isso não há mais setas nem toggle.
+  const pesquisa = document.createElement("div");
+  pesquisa.className = "menu-pesquisa";
+  pesquisa.innerHTML = `<input type="search" id="menu-pesquisa-campo" placeholder="Pesquisar no menu" aria-label="Pesquisar no menu" autocomplete="off">`;
+  menu.appendChild(pesquisa);
+
   let grupoAtual = undefined; // undefined != null, força criar o cabeçalho do primeiro grupo
   let containerGrupoAtual = menu;
 
@@ -498,33 +506,46 @@ function montarMenuLateral() {
     if (item.grupo !== grupoAtual) {
       grupoAtual = item.grupo;
       if (grupoAtual) {
-        const cabecalho = document.createElement("button");
-        cabecalho.type = "button";
-        cabecalho.className = "grupo-menu";
-        cabecalho.innerHTML = `<span class="seta-grupo-menu">▶</span> ${grupoAtual}`;
+        const bloco = document.createElement("div");
+        bloco.className = "menu-bloco";
+        bloco.setAttribute("role", "group");
+        bloco.setAttribute("aria-label", grupoAtual);
+
+        const cabecalho = document.createElement("span");
+        cabecalho.className = "menu-grupo";
+        cabecalho.setAttribute("aria-hidden", "true");
+        cabecalho.textContent = grupoAtual;
 
         const containerItens = document.createElement("div");
-        containerItens.className = "itens-grupo-menu oculto"; // começa recolhido
+        containerItens.className = "itens-grupo-menu";
 
-        cabecalho.addEventListener("click", () => {
-          const recolhido = containerItens.classList.toggle("oculto");
-          cabecalho.querySelector(".seta-grupo-menu").textContent = recolhido ? "▶" : "▼";
-        });
-
-        menu.appendChild(cabecalho);
-        menu.appendChild(containerItens);
+        bloco.appendChild(cabecalho);
+        bloco.appendChild(containerItens);
+        menu.appendChild(bloco);
         containerGrupoAtual = containerItens;
       } else {
-        containerGrupoAtual = menu; // itens sem grupo (ex: Início) ficam soltos, fora de qualquer grupo recolhível
+        containerGrupoAtual = menu; // itens sem grupo (ex: Início) ficam soltos
       }
     }
 
     const botao = document.createElement("button");
     botao.className = "item-menu";
     botao.dataset.chave = item.chave;
-    botao.innerHTML = `<span class="icone-menu">${item.icone}</span> ${item.rotulo}`;
+    botao.dataset.rotuloBusca = normalizarTexto(item.rotulo);
+    botao.textContent = item.rotulo;
     botao.addEventListener("click", () => navegarPara(item.chave));
     containerGrupoAtual.appendChild(botao);
+  });
+
+  // Pesquisa: esconde os itens que não combinam e os grupos que ficaram vazios.
+  pesquisa.querySelector("input").addEventListener("input", (evento) => {
+    const termo = normalizarTexto(evento.target.value);
+    menu.querySelectorAll(".item-menu").forEach((b) => {
+      b.hidden = !!termo && !b.dataset.rotuloBusca.includes(termo);
+    });
+    menu.querySelectorAll(".menu-bloco").forEach((bloco) => {
+      bloco.hidden = !bloco.querySelector(".item-menu:not([hidden])");
+    });
   });
 
   const rodapeVersao = document.createElement("div");
@@ -586,6 +607,9 @@ function navegarPara(chave) {
       break;
     case "relatorios-detalhados":
       renderizarRelatoriosDetalhados(area);
+      break;
+    case "exportar-pastas":
+      renderizarExportarPastas(area);
       break;
     case "modalidades-licitacao":
       renderizarCadastroSimples(area, "modalidadesLicitacao", "Modalidade de Licitação");

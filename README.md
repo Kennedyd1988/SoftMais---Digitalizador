@@ -210,6 +210,15 @@ está tudo certo.
 
 ## Changelog
 
+**v8.21** — Módulo **Credores/Fornecedores** no padrão SOFT+: a lista deixou
+de ser cartões e virou **tabela** (Nome/Razão social, Tipo, CPF/CNPJ, Contato,
+Ações com "Editar" e "Excluir" em texto), como no painel do Portal PNTP. Os
+botões Modelo/Importar/Exportar perderam os emojis (vale para todos os módulos
+que usam a importação). Também passou a escapar o nome com `escaparHtml` na lista.
+Busca, paginação ("Carregar mais"), importação, exclusão com checagem de vínculo
+e sincronização de nome nas despesas não mudaram. Os demais módulos continuam em
+cartões até aprovação deste.
+
 **v8.20** — Varredura de todas as telas no padrão do Portal PNTP: login
 (metade azul lisa/metade branca), escolha da unidade, indicadores do Início e
 Relatórios (faixa colorida no topo), tabelas de relatório, árvore de navegação,

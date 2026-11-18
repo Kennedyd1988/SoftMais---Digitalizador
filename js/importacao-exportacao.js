@@ -126,9 +126,9 @@ function adicionarBotoesImportExport(container, opcoes) {
   const grupo = document.createElement("div");
   grupo.className = "grupo-botoes-planilha";
   grupo.innerHTML = `
-    <button type="button" class="botao-secundario" id="btn-modelo-planilha">📄 Modelo</button>
-    <button type="button" class="botao-secundario" id="btn-importar-planilha">⬆️ Importar</button>
-    <button type="button" class="botao-secundario" id="btn-exportar-planilha">⬇️ Exportar</button>
+    <button type="button" class="botao-secundario" id="btn-modelo-planilha">Modelo</button>
+    <button type="button" class="botao-secundario" id="btn-importar-planilha">Importar</button>
+    <button type="button" class="botao-secundario" id="btn-exportar-planilha">Exportar</button>
     <input type="file" id="campo-arquivo-planilha" accept=".xlsx" class="oculto">
   `;
   const areaProgresso = document.createElement("div");

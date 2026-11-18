@@ -657,6 +657,21 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--brand); }
 .arvore-item-subdivisao { color: var(--text-dim); padding: 5px 10px; }
 .arvore-item-subdivisao:hover { color: var(--brand); }
 
+/* ---- Listas em tabela (padrão do painel do Portal PNTP) ---- */
+.tabela-caixa { background: var(--branco); border: 1px solid #dfe8f2; border-radius: 14px; overflow-x: auto; box-shadow: 0 6px 18px rgba(15,41,71,.04); max-width: 100%; }
+.tabela { width: 100%; min-width: 680px; border-collapse: collapse; font-size: 14px; }
+.tabela th { text-align: left; background: #eef4fb; color: var(--text); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; padding: 10px 14px; white-space: nowrap; }
+.tabela td { padding: 12px 14px; border-top: 1px solid var(--line); vertical-align: middle; }
+.tabela tbody tr:hover td { background: #f8fbfe; }
+.tabela .linha-clicavel { cursor: pointer; }
+.tabela th.acoes, .tabela td.acoes { text-align: right; white-space: nowrap; }
+.tabela td.acoes .botao-pequeno + .botao-pequeno { margin-left: 6px; }
+.tabela .texto-contato { color: var(--text-dim); font-size: 13px; }
+.tabela .linha-vazia { text-align: center; padding: 28px 14px; }
+.botao-pequeno { height: 34px; padding: 0 12px; font-size: 13px; }
+.etiqueta { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--ink); color: var(--text-dim); white-space: nowrap; }
+.botao-carregar-mais { margin: 14px auto 0; display: flex; }
+
 button, select, input, textarea { font-family: inherit; } /* botões herdam a fonte Inter, como no Portal */
 
 @media (max-width: 820px) {

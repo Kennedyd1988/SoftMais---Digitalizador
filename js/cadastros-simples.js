@@ -214,9 +214,19 @@ async function renderizarCredores(area) {
     <div class="barra-busca">
       <input type="text" id="campo-busca" placeholder="Buscar por nome ou CPF/CNPJ...">
     </div>
-    <div id="lista-registros" class="lista-cartoes"></div>
-    <button id="btn-carregar-mais" class="botao-secundario oculto">Carregar mais</button>
+    <!-- Padrão SOFT+: lista em tabela, como no painel do Portal PNTP. -->
+    <div class="tabela-caixa">
+      <table class="tabela tabela-credores">
+        <thead>
+          <tr><th>Nome / Razão social</th><th>Tipo</th><th>CPF/CNPJ</th><th>Contato</th>${usuarioPodeEditar() ? `<th class="acoes">Ações</th>` : ""}</tr>
+        </thead>
+        <tbody id="lista-registros"></tbody>
+      </table>
+    </div>
+    <button id="btn-carregar-mais" class="botao-secundario botao-carregar-mais oculto">Carregar mais</button>
   `;
+  const colunasTabela = usuarioPodeEditar() ? 5 : 4;
+  const linhaVazia = (texto) => `<tr><td colspan="${colunasTabela}" class="texto-secundario linha-vazia">${texto}</td></tr>`;
 
   const paginador = criarPaginador(colecaoEntidade("credores").orderBy("nomeNormalizado"));
 
@@ -266,7 +276,7 @@ async function renderizarCredores(area) {
       registros.forEach((registro) => lista.appendChild(criarCartaoCredor(registro)));
       document.getElementById("btn-carregar-mais").classList.toggle("oculto", !paginador.temMais);
       if (limpar && registros.length === 0) {
-        lista.innerHTML = `<p class="texto-secundario">Nenhum registro encontrado.</p>`;
+        lista.innerHTML = linhaVazia("Nenhum registro encontrado.");
       }
     } catch (erro) {
       tratarErroConsultaFirestore(erro);
@@ -275,32 +285,35 @@ async function renderizarCredores(area) {
   }
 
   function criarCartaoCredor(registro) {
-    const cartao = document.createElement("div");
-    cartao.className = "cartao-registro cartao-clicavel";
-    cartao.innerHTML = `
-      <div>
-        <strong>${registro.nome}</strong>
-        <div class="texto-secundario">${registro.tipo === "PJ" ? "CNPJ" : "CPF"}: ${escaparHtml(registro.documento)}</div>
-      </div>
+    // Agora devolve uma linha de tabela (mantido o nome da função para não
+    // mexer nas chamadas). Texto livre sempre passa por escaparHtml.
+    const contato = [registro.telefone, registro.email].filter(Boolean).map(escaparHtml).join(" · ");
+    const linha = document.createElement("tr");
+    linha.className = "linha-clicavel";
+    linha.innerHTML = `
+      <td><strong>${escaparHtml(registro.nome)}</strong></td>
+      <td><span class="etiqueta">${registro.tipo === "PJ" ? "Pessoa jurídica" : "Pessoa física"}</span></td>
+      <td class="num">${escaparHtml(registro.documento)}</td>
+      <td class="texto-contato">${contato || "—"}</td>
       ${
         usuarioPodeEditar()
-          ? `<div class="acoes-cartao">
-               <button class="botao-icone" data-acao="editar">✏️</button>
-               <button class="botao-icone" data-acao="excluir">🗑️</button>
-             </div>`
+          ? `<td class="acoes">
+               <button class="botao-secundario botao-pequeno" data-acao="editar">Editar</button>
+               <button class="botao-perigo botao-pequeno" data-acao="excluir">Excluir</button>
+             </td>`
           : ""
       }
     `;
-    cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", (evento) => {
+    linha.querySelector('[data-acao="editar"]')?.addEventListener("click", (evento) => {
       evento.stopPropagation();
       abrirFormulario(registro);
     });
-    cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) => {
+    linha.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) => {
       evento.stopPropagation();
       excluirCredor(registro);
     });
-    cartao.addEventListener("click", () => abrirFormulario(registro));
-    return cartao;
+    linha.addEventListener("click", () => abrirFormulario(registro));
+    return linha;
   }
 
   function abrirFormulario(registro = null) {
@@ -421,7 +434,7 @@ async function renderizarCredores(area) {
           .get();
         snapshot.docs.forEach((doc) => lista.appendChild(criarCartaoCredor({ id: doc.id, ...doc.data() })));
         if (snapshot.empty) {
-          lista.innerHTML = `<p class="texto-secundario">Nenhum resultado encontrado.</p>`;
+          lista.innerHTML = linhaVazia("Nenhum resultado encontrado.");
         }
         document.getElementById("btn-carregar-mais").classList.add("oculto");
       } catch (erro) {

@@ -10,6 +10,10 @@ async function renderizarCadastroSimples(area, nomeColecao, rotuloSingular, opco
   // opcoesCampoCodigo, quando informado, ativa um campo extra "Código"
   // (usado hoje por Unidade Orçamentária e Fonte de Recurso). Formato:
   // { rotulo: "Código", exemplo: "10000", obrigatorio: true }
+  // Padrão SOFT+: lista em tabela (como no painel do Portal PNTP). A coluna
+  // "Código" só existe nos cadastros que usam esse campo.
+  const colunasTabela = (opcoesCampoCodigo ? 1 : 0) + 1 + (usuarioPodeEditar() ? 1 : 0);
+  const linhaVazia = (texto) => `<tr><td colspan="${colunasTabela}" class="texto-secundario linha-vazia">${texto}</td></tr>`;
   area.innerHTML = `
     <div class="cabecalho-pagina">
       <h2>${rotuloSingular}s</h2>
@@ -18,8 +22,15 @@ async function renderizarCadastroSimples(area, nomeColecao, rotuloSingular, opco
     <div class="barra-busca">
       <input type="text" id="campo-busca" placeholder="Buscar ${rotuloSingular.toLowerCase()}...">
     </div>
-    <div id="lista-registros" class="lista-cartoes"></div>
-    <button id="btn-carregar-mais" class="botao-secundario oculto">Carregar mais</button>
+    <div class="tabela-caixa">
+      <table class="tabela">
+        <thead>
+          <tr>${opcoesCampoCodigo ? `<th class="col-codigo">${escaparHtml(opcoesCampoCodigo.rotulo)}</th>` : ""}<th>Nome</th>${usuarioPodeEditar() ? `<th class="acoes">Ações</th>` : ""}</tr>
+        </thead>
+        <tbody id="lista-registros"></tbody>
+      </table>
+    </div>
+    <button id="btn-carregar-mais" class="botao-secundario botao-carregar-mais oculto">Carregar mais</button>
   `;
 
   const paginador = criarPaginador(
@@ -34,7 +45,7 @@ async function renderizarCadastroSimples(area, nomeColecao, rotuloSingular, opco
       registros.forEach((registro) => lista.appendChild(criarCartaoSimples(registro)));
       document.getElementById("btn-carregar-mais").classList.toggle("oculto", !paginador.temMais);
       if (limpar && registros.length === 0) {
-        lista.innerHTML = `<p class="texto-secundario">Nenhum registro encontrado.</p>`;
+        lista.innerHTML = linhaVazia("Nenhum registro encontrado.");
       }
     } catch (erro) {
       tratarErroConsultaFirestore(erro);
@@ -43,43 +54,51 @@ async function renderizarCadastroSimples(area, nomeColecao, rotuloSingular, opco
   }
 
   function criarCartaoSimples(registro) {
-    const cartao = document.createElement("div");
-    cartao.className = "cartao-registro cartao-clicavel";
-    cartao.innerHTML = `
-      <span>${opcoesCampoCodigo && registro.codigo ? `<span class="num">${registro.codigo}</span> — ` : ""}${registro.nome}</span>
+    // Devolve uma linha de tabela (nome mantido para não mexer nas chamadas).
+    const linha = document.createElement("tr");
+    linha.className = "linha-clicavel";
+    linha.innerHTML = `
+      ${opcoesCampoCodigo ? `<td class="num col-codigo">${escaparHtml(registro.codigo) || "—"}</td>` : ""}
+      <td><strong>${escaparHtml(registro.nome)}</strong></td>
       ${
         usuarioPodeEditar()
-          ? `<div class="acoes-cartao">
-               <button class="botao-icone" data-acao="editar">✏️</button>
-               <button class="botao-icone" data-acao="excluir">🗑️</button>
-             </div>`
+          ? `<td class="acoes">
+               <button class="botao-secundario botao-pequeno" data-acao="editar">Editar</button>
+               <button class="botao-perigo botao-pequeno" data-acao="excluir">Excluir</button>
+             </td>`
           : ""
       }
     `;
-    cartao.querySelector('[data-acao="editar"]')?.addEventListener("click", (evento) => {
+    linha.querySelector('[data-acao="editar"]')?.addEventListener("click", (evento) => {
       evento.stopPropagation();
       abrirFormulario(registro);
     });
-    cartao.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) => {
+    linha.querySelector('[data-acao="excluir"]')?.addEventListener("click", (evento) => {
       evento.stopPropagation();
       excluirRegistro(registro);
     });
-    cartao.addEventListener("click", () => abrirFormulario(registro));
-    return cartao;
+    linha.addEventListener("click", () => abrirFormulario(registro));
+    return linha;
   }
 
   function abrirFormulario(registro = null) {
     const nomeAtual = registro?.nome || "";
     const codigoAtual = registro?.codigo || "";
     const modal = criarModal(`${registro ? "Editar" : "Novo"} ${rotuloSingular}`, `
-      ${
-        opcoesCampoCodigo
-          ? `<label>${opcoesCampoCodigo.rotulo} ${opcoesCampoCodigo.obrigatorio ? "*" : ""}</label>
-             <input type="text" id="campo-codigo" placeholder="Ex: ${opcoesCampoCodigo.exemplo}" value="${codigoAtual}">`
-          : ""
-      }
-      <label>Nome *</label>
-      <input type="text" id="campo-nome" value="${nomeAtual.replace(/"/g, "&quot;")}">
+      <div class="grade-form">
+        ${
+          opcoesCampoCodigo
+            ? `<div class="campo-form span-2">
+                 <label for="campo-codigo">${escaparHtml(opcoesCampoCodigo.rotulo)}${opcoesCampoCodigo.obrigatorio ? " *" : ""}</label>
+                 <input type="text" id="campo-codigo" placeholder="Ex: ${escaparHtml(opcoesCampoCodigo.exemplo)}" value="${escaparHtml(codigoAtual)}">
+               </div>`
+            : ""
+        }
+        <div class="campo-form span-2">
+          <label for="campo-nome">Nome *</label>
+          <input type="text" id="campo-nome" value="${escaparHtml(nomeAtual)}">
+        </div>
+      </div>
     `, async (botaoSalvar) => {
       const campoNome = document.getElementById("campo-nome");
       const campoCodigo = document.getElementById("campo-codigo");
@@ -159,7 +178,7 @@ async function renderizarCadastroSimples(area, nomeColecao, rotuloSingular, opco
           lista.appendChild(criarCartaoSimples({ id: doc.id, ...doc.data() }))
         );
         if (snapshot.empty) {
-          lista.innerHTML = `<p class="texto-secundario">Nenhum resultado encontrado.</p>`;
+          lista.innerHTML = linhaVazia("Nenhum resultado encontrado.");
         }
         document.getElementById("btn-carregar-mais").classList.add("oculto");
       } catch (erro) {

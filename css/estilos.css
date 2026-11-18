@@ -697,3 +697,5 @@ button, select, input, textarea { font-family: inherit; } /* botões herdam a fo
 .campo-form label { margin: 0; font-size: 13px; font-weight: 700; color: var(--text); }
 .campo-form input, .campo-form select, .campo-form textarea { width: 100%; }
 @media (max-width: 560px) { .grade-form { grid-template-columns: 1fr; } }
+
+.tabela th.col-codigo, .tabela td.col-codigo { width: 140px; }

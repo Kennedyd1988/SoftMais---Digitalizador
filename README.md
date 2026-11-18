@@ -210,6 +210,8 @@ está tudo certo.
 
 ## Changelog
 
+**v8.24** — Cadastros simples no padrão SOFT+ (Modalidades de Licitação, Unidades Orçamentárias, Fontes de Recurso, Tipos de Documento e também Tipos de Documento de Pessoal e de Ato Administrativo, que usam a mesma função genérica): lista em tabela (coluna Código só onde existe) com paginação numerada e botões Editar/Excluir com texto, e janela de edição na grade `.grade-form`. Texto dos campos passa por `escaparHtml`. Regras mantidas: bloqueio de exclusão com vínculo, busca normalizada e "Carregar mais".
+
 **v8.23** — **Tela de edição do Credor** no padrão SOFT+: campos em grade (Tipo e CPF/CNPJ lado a lado, nome em linha inteira, telefone e e-mail lado a lado; uma coluna no celular). Rótulos acompanham o tipo (CPF/Nome para pessoa física, CNPJ/Razão social para jurídica) e o documento ganhou máscara de digitação. A máscara não bloqueia o salvamento: cadastros antigos sem formatação continuam abrindo e salvando normalmente. Texto dos campos agora passa por `escaparHtml` (antes só as aspas eram tratadas). Removido o emoji do botão Excluir da janela interna (vale para todos os formulários). Classes `.grade-form/.campo-form/.span-2` ficam disponíveis para os próximos formulários.
 
 **v8.22** — **Paginação numerada** em todas as tabelas de listagem (`.tabela-caixa`), igual ao painel do Portal PNTP: "‹ 1 2 3 … ›" e "Linhas a–b de N", 25 linhas por página. Ela só divide na tela o que já foi carregado; a consulta ao Firestore continua em lotes de 50 com cursor e botão "Carregar mais" (regra do projeto: nunca baixar tudo). Quando um lote novo chega, a tela pula para a primeira página com linhas novas; busca/filtro volta à página 1. Funciona sozinha em qualquer módulo que passe a usar tabela.

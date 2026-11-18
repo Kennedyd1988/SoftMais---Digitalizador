@@ -602,6 +602,25 @@ input:focus, select:focus, textarea:focus { border-color: var(--acento); box-sha
 .aba-manutencao-ativa::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--branco); }
 .abas-manutencao + * { margin-top: 16px; }
 
+/* Indicadores do Início/Relatórios: mesma faixa colorida no topo dos "resumo" do Portal */
+.cartao-resumo { --k: #1d5fd1; border-radius: 14px; border-color: #dfe8f2; border-top: 4px solid var(--k); box-shadow: 0 6px 16px rgba(15,41,71,.05); }
+.cartao-resumo:nth-child(4n+2) { --k: #c07a0a; } .cartao-resumo:nth-child(4n+3) { --k: #c2416b; } .cartao-resumo:nth-child(4n+4) { --k: #0a8a62; }
+.rotulo-resumo { color: color-mix(in srgb, var(--k, #1d5fd1) 75%, #0f2947); font-weight: 600; }
+.numero-resumo { color: var(--text); }
+.cartao-atencao:hover { box-shadow: 0 8px 18px rgba(15,41,71,.07); border-color: #c9d8e8; }
+
+/* Tabelas dos relatórios: caixa de 14 px, cabeçalho #eef4fb e linha com destaque ao passar o mouse */
+.tabela-relatorio { border-collapse: separate; border-spacing: 0; border-radius: 14px; border-color: #dfe8f2; box-shadow: 0 6px 18px rgba(15,41,71,.04); }
+.tabela-relatorio th { background: #eef4fb; color: var(--text); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; padding: 10px 14px; }
+.tabela-relatorio td { padding: 10px 14px; }
+.tabela-relatorio tbody tr:hover td { background: #f8fbfe; }
+
+/* Escolha da unidade gestora e árvore de navegação */
+.item-selecao-entidade { border-radius: 12px; border-color: #dfe8f2; }
+.item-selecao-entidade:hover { box-shadow: 0 8px 18px rgba(15,41,71,.07); border-color: var(--brand); }
+.botao-arvore-todos { border-radius: 8px; }
+.arvore-item-subdivisao:hover, .arvore-item-ano:hover { background: var(--ink); }
+
 @media (max-width: 820px) {
   .cabecalho-app { padding: 8px 16px; }
   .area-conteudo { padding: 18px 16px 32px; }
